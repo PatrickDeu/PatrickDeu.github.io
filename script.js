@@ -1,8 +1,8 @@
 document.addEventListener("DOMContentLoaded", function() {
     // --- CONFIGURATION ---
     const MAX_SERIES = 5;
-    const FIXED_LOCATION = 'developed'; // <-- CORRECTED
-    const FIXED_WEIGHTING = 'vw_cap'; // <-- CORRECTED
+    const FIXED_LOCATION = 'developed'; // CORRECTED to match your data.csv
+    const FIXED_WEIGHTING = 'vw_cap';  // CORRECTED to match your data.csv
     const PERIODS_PER_YEAR = 12; // Monthly data
 
     // --- GLOBAL VARIABLES ---
@@ -36,7 +36,18 @@ document.addEventListener("DOMContentLoaded", function() {
 
             // 2. Process and structure the main data
             const allData = Papa.parse(csvText, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
-            const filteredData = allData.filter(d => d.location === FIXED_LOCATION && d.weighting === FIXED_WEIGHTING);
+            
+            // The corrected and more robust filter
+            const filteredData = allData.filter(d => 
+                d.location && d.weighting &&
+                d.location.trim() === FIXED_LOCATION && 
+                d.weighting.trim() === FIXED_WEIGHTING
+            );
+            
+            if (filteredData.length === 0) {
+                alert(`Error: No data found for the fixed settings (Location: ${FIXED_LOCATION}, Weighting: ${FIXED_WEIGHTING}). Please check your data.csv file.`);
+                return;
+            }
 
             // Group data by factor name (abr_jkp)
             for (const row of filteredData) {
@@ -76,7 +87,10 @@ document.addEventListener("DOMContentLoaded", function() {
         // Step B: Calculate ranks for each metric
         const metricsToRank = ['avgReturn', 'volatility', 'sharpeRatio'];
         metricsToRank.forEach(metric => {
-            const sorted = Object.entries(stats).sort((a, b) => b[1][metric] - a[1][metric]);
+            // For volatility, lower is better, so we sort ascending
+            const sortOrder = metric === 'volatility' ? 1 : -1;
+            const sorted = Object.entries(stats).sort((a, b) => (a[1][metric] - b[1][metric]) * sortOrder);
+            
             sorted.forEach(([name], i) => {
                 stats[name][`${metric}Rank`] = i + 1;
             });
@@ -190,8 +204,16 @@ document.addEventListener("DOMContentLoaded", function() {
             select.add(new Option(fullName, abr));
         });
 
-        newRow.querySelector('.remove-btn').addEventListener('click', () => newRow.remove());
+        newRow.querySelector('.remove-btn').addEventListener('click', () => {
+            newRow.remove();
+            updateAddButtonState();
+        });
         seriesSelectorsContainer.appendChild(newRow);
+        updateAddButtonState();
+    }
+    
+    function updateAddButtonState() {
+        addSeriesBtn.disabled = seriesSelectorsContainer.children.length >= MAX_SERIES;
     }
     
     function getRandomColor() {
