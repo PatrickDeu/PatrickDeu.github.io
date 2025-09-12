@@ -1,6 +1,6 @@
-/* Basic Setup & Fonts */
+/* Basic Setup & Font */
 body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Times New Roman', Times, serif;
     background-color: #f8f9fa;
     color: #212529;
     margin: 0;
@@ -14,42 +14,33 @@ body {
 
 /* Header and Navigation */
 .site-header {
-    background-color: #fff;
-    padding: 20px 40px;
+    text-align: center;
+    padding: 20px;
     border-bottom: 1px solid #e9ecef;
+    background-color: #fff;
 }
 
 .site-header h1 {
+    margin: 0;
+    font-weight: 400;
     font-size: 2.5em;
-    text-align: center;
-    margin: 0 0 20px 0;
-    font-weight: 300;
-    letter-spacing: 2px;
 }
 
 .main-nav {
-    display: flex;
-    justify-content: center;
-    gap: 40px;
+    margin-top: 15px;
 }
 
 .main-nav a {
     text-decoration: none;
     color: #495057;
+    margin: 0 15px;
     font-size: 1.1em;
-    padding-bottom: 5px;
-    border-bottom: 2px solid transparent;
-    transition: color 0.2s, border-color 0.2s;
-}
-
-.main-nav a:hover {
-    color: #000;
 }
 
 .main-nav a.active {
-    color: #000;
     font-weight: bold;
-    border-bottom: 2px solid #007bff;
+    color: #000;
+    border-bottom: 2px solid #000;
 }
 
 /* Card Styling */
@@ -61,7 +52,7 @@ body {
     margin-bottom: 25px;
 }
 
-/* Controls Section */
+/* Controls Section (same as before) */
 .controls-header {
     background-color: #000;
     color: #fff;
@@ -70,7 +61,6 @@ body {
     border-radius: 6px 6px 0 0;
     font-weight: bold;
 }
-
 .series-row {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -78,7 +68,6 @@ body {
     align-items: center;
     margin-bottom: 15px;
 }
-
 select, button {
     padding: 12px;
     border-radius: 5px;
@@ -86,39 +75,43 @@ select, button {
     font-size: 16px;
     cursor: pointer;
     background-color: #fff;
+    font-family: 'Times New Roman', Times, serif;
 }
-
 .action-buttons {
     margin-top: 20px;
     border-top: 1px solid #e9ecef;
     padding-top: 20px;
 }
+#add-series-btn { border-color: #adb5bd; color: #495057; }
+#plot-btn { border: 1px solid #212529; font-weight: bold; }
+#plot-btn:hover { background-color: #212529; color: #fff; }
+.remove-btn { border: 1px solid #dc3545; color: #dc3545; }
+.remove-btn:hover { background-color: #dc3545; color: white; }
 
-#add-series-btn {
-    border-style: solid;
-    border-color: #adb5bd;
-    color: #495057;
+/* Performance Table Styling */
+.table-card {
+    padding-top: 10px;
 }
 
-#plot-btn {
-    background-color: #fff;
-    color: #212529;
-    border: 1px solid #212529;
+#performance-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 16px;
+}
+
+#performance-table th, #performance-table td {
+    border: 1px solid #dee2e6;
+    padding: 12px;
+    text-align: left;
+}
+
+#performance-table th {
+    background-color: #f8f9fa;
     font-weight: bold;
 }
 
-#plot-btn:hover {
-    background-color: #212529;
-    color: #fff;
-}
-
-.remove-btn {
-    background-color: transparent;
-    border: 1px solid #dc3545;
-    color: #dc3545;
-}
-
-.remove-btn:hover {
-    background-color: #dc3545;
-    color: white;
+.rank {
+    color: #6c757d;
+    font-size: 0.9em;
+    margin-left: 5px;
 }
