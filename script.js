@@ -9,8 +9,6 @@ document.addEventListener("DOMContentLoaded", function() {
     let factorTimeSeriesData = new Map();
     let nameMap = new Map();
     let allFactorStats = {};
-
-    // --- NEW: A SINGLE, PERSISTENT AUDIO PLAYER ---
     const audioPlayer = new Audio();
     let currentlyPlayingButton = null;
     
@@ -24,7 +22,6 @@ document.addEventListener("DOMContentLoaded", function() {
     // --- INITIALIZATION ---
     async function init() {
         try {
-            // Data loading remains the same...
             const [rawDataResponse, namesResponse, statsResponse] = await Promise.all([
                 fetch('data.csv'),
                 fetch('factor_names.csv'),
@@ -45,13 +42,10 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             factorTimeSeriesData.forEach(series => series.sort((a, b) => a.date - b.date));
             
-            // UI setup remains the same...
+            setupAudioPlayerListeners();
             addSeriesRow();
             addSeriesBtn.addEventListener('click', addSeriesRow);
             plotBtn.addEventListener('click', handlePlotting);
-            
-            // --- NEW: SETUP EVENT LISTENERS ON THE SINGLE AUDIO PLAYER ---
-            setupAudioPlayerListeners();
             tableBody.addEventListener('click', handleAudioPlay);
 
         } catch (error) {
@@ -60,9 +54,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // --- NEW: SETUP AUDIO PLAYER LISTENERS (done only once) ---
     function setupAudioPlayerListeners() {
-        // When a sound finishes playing naturally, reset its button
         audioPlayer.addEventListener('ended', () => {
             if (currentlyPlayingButton) {
                 currentlyPlayingButton.textContent = 'Play';
@@ -70,8 +62,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 currentlyPlayingButton = null;
             }
         });
-
-        // If there's an error loading a sound file, alert the user and reset
         audioPlayer.addEventListener('error', () => {
             alert(`Error: Could not find or play the requested audio file.`);
             if (currentlyPlayingButton) {
@@ -82,40 +72,28 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // --- NEW: THE CORRECTED AUDIO HANDLING LOGIC ---
     function handleAudioPlay(event) {
         const clickedButton = event.target;
         if (!clickedButton.classList.contains('play-btn')) return;
-
         const audioSrc = clickedButton.dataset.audioSrc;
-
-        // CASE 1: The user clicked the button that is already playing.
         if (clickedButton === currentlyPlayingButton) {
             audioPlayer.pause();
             clickedButton.textContent = 'Play';
             clickedButton.classList.remove('playing');
             currentlyPlayingButton = null;
-        } 
-        // CASE 2: The user clicked a new button.
-        else {
-            // If another button was playing, reset it first.
+        } else {
             if (currentlyPlayingButton) {
                 currentlyPlayingButton.textContent = 'Play';
                 currentlyPlayingButton.classList.remove('playing');
             }
-
-            // Set the new source on our single player and play it.
             audioPlayer.src = audioSrc;
             audioPlayer.play();
-
-            // Update the state to the newly clicked button.
             clickedButton.textContent = 'Stop';
             clickedButton.classList.add('playing');
             currentlyPlayingButton = clickedButton;
         }
     }
     
-    // --- ALL OTHER FUNCTIONS REMAIN THE SAME ---
     function loadPrecomputedStats(csvText) {
         const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
         const stats = {};
@@ -128,44 +106,110 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         allFactorStats = { stats, total: totalFactors };
     }
+
     function handlePlotting() {
         const selectedFactors = getSelectedFactors();
         if (selectedFactors.length === 0) { alert("Please select at least one factor."); return; }
         plotChart(selectedFactors);
         updatePerformanceTable(selectedFactors);
     }
+    
+    // --- THIS FUNCTION CONTAINS ALL THE AESTHETIC UPDATES ---
     function plotChart(selectedFactors) {
+        const allDates = new Set();
+        selectedFactors.forEach(name => {
+            const series = factorTimeSeriesData.get(name);
+            if (series) {
+                series.forEach(d => allDates.add(d.date.getTime()));
+            }
+        });
+        const masterDateArray = Array.from(allDates).sort((a, b) => a - b);
+
         const datasets = selectedFactors.map(name => {
             const series = factorTimeSeriesData.get(name);
             if (!series || series.length === 0) return null;
-            let cumulativeReturn = 1;
-            const dataPoints = series.map(d => {
-                cumulativeReturn *= (1 + d.ret);
-                return { x: d.date.getTime(), y: cumulativeReturn };
+            const returnMap = new Map(series.map(d => [d.date.getTime(), d.ret]));
+            let cumulativeValue = null;
+            const dataPoints = masterDateArray.map(dateMs => {
+                if (returnMap.has(dateMs)) {
+                    if (cumulativeValue === null) { cumulativeValue = 1; }
+                    cumulativeValue *= (1 + returnMap.get(dateMs));
+                }
+                return { x: dateMs, y: cumulativeValue };
             });
             return {
                 label: nameMap.get(name) || name, data: dataPoints,
-                borderColor: getRandomColor(), fill: false, tension: 0.1, pointRadius: 0
+                borderColor: getRandomColor(), fill: false, tension: 0.1, pointRadius: 0,
+                spanGaps: false
             };
         }).filter(Boolean);
+        
         if (chart) chart.destroy();
         const ctx = document.getElementById('factorChart').getContext('2d');
+        
         chart = new Chart(ctx, {
-            type: 'line', data: { datasets },
+            type: 'line', 
+            data: { datasets },
             options: {
-                responsive: true, interaction: { mode: 'index', intersect: false },
+                // FIX 1: RESPONSIVENESS - Allow chart to grow and shrink
+                responsive: true,
+                maintainAspectRatio: false, // This is the key to making it grow back
+
+                interaction: { mode: 'index', intersect: false },
+                
                 scales: {
-                    x: { type: 'time', time: { unit: 'year' }, title: { display: true, text: 'Date' } },
-                    y: { type: 'logarithmic', title: { display: true, text: 'Growth of $1 (Log Scale)' } }
+                    x: { 
+                        type: 'time', 
+                        time: { 
+                            unit: 'year',
+                            // FIX 2: X-AXIS TICKS - Show a label roughly every 10 years
+                            stepSize: 10,
+                            // This formats the axis labels themselves (e.g., '2000', '2010')
+                            displayFormats: {
+                                year: 'yyyy'
+                            }
+                        },
+                        title: { display: true, text: 'Date' },
+                        // FIX 3: REMOVE VERTICAL GRID LINES
+                        grid: {
+                            display: false 
+                        }
+                    },
+                    y: { 
+                        // FIX 4: Y-AXIS SCALE - No longer logarithmic
+                        type: 'linear', 
+                        title: { 
+                            display: true, 
+                            // FIX 5: Y-AXIS LABEL
+                            text: 'Cumulative Wealth' 
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            // FIX 6: TOOLTIP FORMAT - Show only Year, Month, Day
+                            title: function(tooltipItems) {
+                                const date = new Date(tooltipItems[0].parsed.x);
+                                // Using Intl.DateTimeFormat for clean, localized date formatting
+                                return new Intl.DateTimeFormat('en-GB', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                }).format(date);
+                            }
+                        }
+                    }
                 }
             }
         });
     }
+
     function updatePerformanceTable(selectedFactors) {
         tableBody.innerHTML = '';
         selectedFactors.forEach(name => {
             const stats = allFactorStats.stats[name];
-            if (!stats) { console.warn(`No performance stats for factor '${name}'. Skipping.`); return; }
+            if (!stats) { console.warn(`No stats for '${name}'.`); return; }
             const row = tableBody.insertRow();
             const total = allFactorStats.total;
             const formatCell = (value, rank, isPercent = false) => {
@@ -173,7 +217,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 const rankText = rank ? `<span class="rank">(${rank}/${total})</span>` : '';
                 return `${displayValue} ${rankText}`;
             };
-            const audioPath = `audio_portfolios/portfolio_${name}.wav`;
             row.innerHTML = `
                 <td>${nameMap.get(name) || name}</td>
                 <td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td>
@@ -182,13 +225,15 @@ document.addEventListener("DOMContentLoaded", function() {
                 <td>${formatCell(stats['AnnoyanceScore'], stats['AnnoyanceScore_rank'])}</td>
                 <td>${formatCell(stats['CAPM Alpha (Ann. %)'], stats['CAPM Alpha (Ann. %)_rank'])}</td>
                 <td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td>
-                <td><button class="play-btn" data-audio-src="${audioPath}">Play</button></td>
+                <td><button class="play-btn" data-audio-src="audio_portfolios/portfolio_${name}.wav">Play</button></td>
             `;
         });
     }
+
     function getSelectedFactors() {
         return Array.from(seriesSelectorsContainer.querySelectorAll('.factor-select')).map(sel => sel.value);
     }
+    
     function addSeriesRow() {
         if (seriesSelectorsContainer.children.length >= MAX_SERIES) return;
         const newRow = rowTemplate.cloneNode(true);
@@ -201,6 +246,7 @@ document.addEventListener("DOMContentLoaded", function() {
         newRow.querySelector('.remove-btn').addEventListener('click', () => newRow.remove());
         seriesSelectorsContainer.appendChild(newRow);
     }
+    
     function getRandomColor() {
         const r = Math.floor(Math.random() * 200), g = Math.floor(Math.random() * 200), b = Math.floor(Math.random() * 200);
         return `rgb(${r},${g},${b})`;
