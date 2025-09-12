@@ -3,39 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Factor Plotter</title>
+    <title>Portfolio Sonification</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="container">
-        <!-- Controls Section -->
-        <div class="card controls-card">
-            <div class="controls-header">
-                <span>REGION/COUNTRY</span>
-                <span>THEME/FACTOR</span>
-                <span>WEIGHTING</span>
-            </div>
-            <div id="series-selectors">
-                <!-- Selector rows will be dynamically added here -->
-            </div>
-            <div class="action-buttons">
-                <button id="add-series-btn">+ Add Time Series</button>
-                <button id="plot-btn">Plot</button>
-            </div>
-        </div>
+    <header class="site-header">
+        <h1>Portfolio Sonification</h1>
+        <nav class="main-nav">
+            <a href="#about">About</a>
+            <a href="#analysis" class="active">Analysis</a>
+        </nav>
+    </header>
 
-        <!-- Chart Section -->
-        <div class="card chart-card">
-            <canvas id="myChart"></canvas>
-        </div>
-    </div>
+    <main class="container">
+        <!-- The Analysis Tool Section -->
+        <section id="analysis">
+            <div class="card controls-card">
+                <div class="controls-header">
+                    <span>THEME/FACTOR</span>
+                </div>
+                <div id="series-selectors">
+                    <!-- Selector rows will be dynamically added here by JavaScript -->
+                </div>
+                <div class="action-buttons">
+                    <button id="add-series-btn">+ Add Time Series</button>
+                    <button id="plot-btn">Plot</button>
+                </div>
+            </div>
 
-    <!-- Hidden template for a single series selector row -->
+            <div class="card chart-card">
+                <canvas id="factorChart"></canvas>
+            </div>
+        </section>
+
+        <!-- A placeholder for the About section -->
+        <section id="about" style="display: none;">
+             <h2>About This Project</h2>
+             <p>This is a placeholder for the about section.</p>
+        </section>
+    </main>
+
+    <!-- Hidden template for a single factor selector row -->
     <div id="series-row-template" class="series-row" style="display: none;">
-        <select class="location-select"></select>
-        <select class="name-select"></select>
-        <select class="weighting-select"></select>
+        <select class="factor-select"></select>
         <button class="remove-btn">× Remove</button>
     </div>
 
