@@ -1,164 +1,206 @@
 document.addEventListener("DOMContentLoaded", function() {
     // --- CONFIGURATION ---
-    const maxSeries = 5;
+    const MAX_SERIES = 5;
     const FIXED_LOCATION = 'Developed Markets';
     const FIXED_WEIGHTING = 'Capped Value Weighted';
+    const PERIODS_PER_YEAR = 12; // Monthly data
 
     // --- GLOBAL VARIABLES ---
     let chart;
-    let filteredData = []; // Will hold the pre-filtered data
-    let uniqueFactorNames = []; // Will hold the list of factors for dropdowns
+    let factorData = new Map(); // Stores time series data, keyed by factor abbreviation
+    let nameMap = new Map(); // Maps abbreviation to full name
+    let allFactorStats = {}; // Stores pre-calculated stats for all factors
     
-    // --- CACHE DOM ELEMENTS ---
+    // --- DOM ELEMENTS ---
     const seriesSelectorsContainer = document.getElementById('series-selectors');
     const addSeriesBtn = document.getElementById('add-series-btn');
     const plotBtn = document.getElementById('plot-btn');
     const rowTemplate = document.getElementById('series-row-template');
+    const tableBody = document.querySelector("#performance-table tbody");
 
     // --- INITIALIZATION ---
     async function init() {
         try {
-            const response = await fetch('data.csv');
-            const csvText = await response.text();
+            // Load both files concurrently
+            const [dataResponse, namesResponse] = await Promise.all([
+                fetch('data.csv'),
+                fetch('factor_names.csv')
+            ]);
+            
+            const csvText = await dataResponse.text();
+            const namesText = await namesResponse.text();
+            
+            // 1. Create the name map
+            const namesData = Papa.parse(namesText, { header: true, delimiter: ';', skipEmptyLines: true }).data;
+            namesData.forEach(row => nameMap.set(row.abr_jkp, row.name_new));
+
+            // 2. Process and structure the main data
             const allData = Papa.parse(csvText, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
-            
-            // ** CRITICAL STEP: Pre-filter the data **
-            filteredData = allData.filter(d => d.location === FIXED_LOCATION && d.weighting === FIXED_WEIGHTING);
-            
-            if (filteredData.length === 0) {
-                alert(`Error: No data found for the fixed settings (Location: ${FIXED_LOCATION}, Weighting: ${FIXED_WEIGHTING}). Please check your data.csv file.`);
-                return;
+            const filteredData = allData.filter(d => d.location === FIXED_LOCATION && d.weighting === FIXED_WEIGHTING);
+
+            // Group data by factor name (abr_jkp)
+            for (const row of filteredData) {
+                if (!factorData.has(row.name)) {
+                    factorData.set(row.name, []);
+                }
+                factorData.get(row.name).push({ date: new Date(row.date), ret: row.ret });
             }
-
-            // Get unique factor names from the pre-filtered data
-            uniqueFactorNames = [...new Set(filteredData.map(item => item.name))].sort();
+            // Sort each factor's time series by date
+            factorData.forEach(series => series.sort((a, b) => a.date - b.date));
             
-            console.log(`Loaded and pre-filtered data. Found ${uniqueFactorNames.length} unique factors.`);
+            // 3. Pre-calculate stats and ranks for ALL factors
+            precomputeAllStats();
 
-            addSeriesRow(); // Add the first selector row
-            
-            // --- EVENT LISTENERS ---
+            // 4. Set up the UI
+            addSeriesRow();
             addSeriesBtn.addEventListener('click', addSeriesRow);
-            plotBtn.addEventListener('click', plotChart);
+            plotBtn.addEventListener('click', handlePlotting);
 
         } catch (error) {
-            console.error("Failed to load or parse data.csv:", error);
-            alert("Error: Could not load data.csv. See console for details.");
+            console.error("Initialization failed:", error);
+            alert("Error loading or processing data. Please check console for details.");
         }
     }
 
-    // --- UI FUNCTIONS ---
-    function addSeriesRow() {
-        const currentRows = seriesSelectorsContainer.getElementsByClassName('series-row').length;
-        if (currentRows >= maxSeries) {
-            alert(`You can select a maximum of ${maxSeries} series.`);
-            return;
-        }
+    // --- DATA & STATS COMPUTATION ---
+    function precomputeAllStats() {
+        const stats = {};
+        const totalFactors = factorData.size;
 
-        const newRow = rowTemplate.cloneNode(true);
-        newRow.removeAttribute('id');
-        newRow.style.display = 'grid';
-
-        populateFactorDropdown(newRow.querySelector('.factor-select'));
-
-        newRow.querySelector('.remove-btn').addEventListener('click', () => {
-            newRow.remove();
-            updateAddButtonState();
+        // Step A: Calculate raw stats for every factor
+        factorData.forEach((series, name) => {
+            const returns = series.map(d => d.ret);
+            stats[name] = calculateMetrics(returns);
         });
 
-        seriesSelectorsContainer.appendChild(newRow);
-        updateAddButtonState();
-    }
-    
-    function populateFactorDropdown(selectElement) {
-        uniqueFactorNames.forEach(name => {
-            selectElement.add(new Option(name, name));
+        // Step B: Calculate ranks for each metric
+        const metricsToRank = ['avgReturn', 'volatility', 'sharpeRatio'];
+        metricsToRank.forEach(metric => {
+            const sorted = Object.entries(stats).sort((a, b) => b[1][metric] - a[1][metric]);
+            sorted.forEach(([name], i) => {
+                stats[name][`${metric}Rank`] = i + 1;
+            });
         });
-    }
-    
-    function updateAddButtonState() {
-        const currentRows = seriesSelectorsContainer.getElementsByClassName('series-row').length;
-        addSeriesBtn.disabled = currentRows >= maxSeries;
+        
+        allFactorStats = { stats, total: totalFactors };
+        console.log("Pre-computed stats for all factors:", allFactorStats);
     }
 
-    // --- CHARTING FUNCTION ---
-    function plotChart() {
-        const selectedSeriesRows = seriesSelectorsContainer.querySelectorAll('.series-row');
-        if (selectedSeriesRows.length === 0) {
-            alert("Please add at least one factor to plot.");
+    function calculateMetrics(returnsArray) {
+        const n = returnsArray.length;
+        if (n === 0) return { avgReturn: 0, volatility: 0, sharpeRatio: 0 };
+
+        const mean = returnsArray.reduce((a, b) => a + b) / n;
+        const stdDev = Math.sqrt(returnsArray.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n);
+
+        const annReturn = mean * PERIODS_PER_YEAR;
+        const annVol = stdDev * Math.sqrt(PERIODS_PER_YEAR);
+        const sharpe = annVol > 0 ? annReturn / annVol : 0;
+
+        return {
+            avgReturn: annReturn,
+            volatility: annVol,
+            sharpeRatio: sharpe,
+        };
+    }
+
+    // --- UI & PLOTTING ---
+    function handlePlotting() {
+        const selectedFactors = getSelectedFactors();
+        if (selectedFactors.length === 0) {
+            alert("Please select at least one factor.");
             return;
         }
+        plotChart(selectedFactors);
+        updatePerformanceTable(selectedFactors);
+    }
+    
+    function plotChart(selectedFactors) {
+        const datasets = selectedFactors.map(name => {
+            const series = factorData.get(name);
+            let cumulativeReturn = 1;
+            const dataPoints = series.map(d => {
+                cumulativeReturn *= (1 + d.ret);
+                return { x: d.date.getTime(), y: cumulativeReturn };
+            });
 
-        const chartDatasets = [];
-        const allDates = new Set();
-
-        selectedSeriesRows.forEach(row => {
-            const selectedFactorName = row.querySelector('.factor-select').value;
-            
-            // Filter the already-filtered data for the chosen factor name
-            const seriesData = filteredData
-                .filter(d => d.name === selectedFactorName)
-                .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-            if (seriesData.length > 0) {
-                let cumulativeReturn = 1;
-                const plotPoints = seriesData.map(d => {
-                    allDates.add(d.date);
-                    cumulativeReturn *= (1 + d.ret);
-                    return { x: d.date, y: cumulativeReturn };
-                });
-
-                chartDatasets.push({
-                    label: selectedFactorName,
-                    data: plotPoints,
-                    borderColor: getRandomColor(),
-                    fill: false,
-                    tension: 0.1,
-                    pointRadius: 0
-                });
-            }
+            return {
+                label: nameMap.get(name) || name,
+                data: dataPoints,
+                borderColor: getRandomColor(),
+                fill: false,
+                tension: 0.1,
+                pointRadius: 0
+            };
         });
         
         if (chart) chart.destroy();
-
         const ctx = document.getElementById('factorChart').getContext('2d');
         chart = new Chart(ctx, {
             type: 'line',
-            data: {
-                datasets: chartDatasets
-            },
+            data: { datasets },
             options: {
                 responsive: true,
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                    x: {
-                        type: 'time',
-                        time: { unit: 'year' },
-                        title: { display: true, text: 'Date' }
-                    },
-                    y: {
-                        type: 'logarithmic',
-                        title: { display: true, text: 'Growth of $1 (Log Scale)' }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`
-                        }
-                    }
+                    x: { type: 'time', time: { unit: 'year' }, title: { display: true, text: 'Date' } },
+                    y: { type: 'logarithmic', title: { display: true, text: 'Growth of $1 (Log Scale)' } }
                 }
             }
         });
+    }
+
+    function updatePerformanceTable(selectedFactors) {
+        tableBody.innerHTML = ''; // Clear previous results
+
+        selectedFactors.forEach(name => {
+            const stats = allFactorStats.stats[name];
+            if (!stats) return;
+
+            const row = tableBody.insertRow();
+            row.innerHTML = `
+                <td>${nameMap.get(name) || name}</td>
+                <td>${(stats.avgReturn * 100).toFixed(2)}% <span class="rank">(${stats.avgReturnRank}/${allFactorStats.total})</span></td>
+                <td>${(stats.volatility * 100).toFixed(2)}% <span class="rank">(${stats.volatilityRank}/${allFactorStats.total})</span></td>
+                <td>${stats.sharpeRatio.toFixed(2)} <span class="rank">(${stats.sharpeRatioRank}/${allFactorStats.total})</span></td>
+                <td>N/A</td> <!-- Placeholder for Alpha -->
+                <td>N/A</td> <!-- Placeholder for Beta -->
+                <td>N/A</td> <!-- Placeholder for Treynor Ratio -->
+            `;
+        });
+    }
+
+    // --- HELPER & UI SETUP FUNCTIONS ---
+    function getSelectedFactors() {
+        return Array.from(seriesSelectorsContainer.querySelectorAll('.factor-select')).map(sel => sel.value);
+    }
+    
+    function addSeriesRow() {
+        if (seriesSelectorsContainer.children.length >= MAX_SERIES) {
+            alert(`Maximum of ${MAX_SERIES} series reached.`);
+            return;
+        }
+        const newRow = rowTemplate.cloneNode(true);
+        newRow.removeAttribute('id');
+        newRow.style.display = 'grid';
+
+        const select = newRow.querySelector('.factor-select');
+        // Populate dropdown with full names, but value is the abbreviation
+        Array.from(nameMap.entries()).sort((a,b) => a[1].localeCompare(b[1])).forEach(([abr, fullName]) => {
+            select.add(new Option(fullName, abr));
+        });
+
+        newRow.querySelector('.remove-btn').addEventListener('click', () => newRow.remove());
+        seriesSelectorsContainer.appendChild(newRow);
     }
     
     function getRandomColor() {
         const r = Math.floor(Math.random() * 200);
         const g = Math.floor(Math.random() * 200);
         const b = Math.floor(Math.random() * 200);
-        return `rgb(${r}, ${g}, ${b})`;
+        return `rgb(${r},${g},${b})`;
     }
 
-    // Start the application
+    // --- START THE APP ---
     init();
 });
