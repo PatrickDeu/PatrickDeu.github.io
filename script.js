@@ -9,6 +9,9 @@ document.addEventListener("DOMContentLoaded", function() {
     let factorTimeSeriesData = new Map();
     let nameMap = new Map();
     let allFactorStats = {};
+    // NEW: For managing audio playback
+    let currentAudio = null;
+    let currentlyPlayingButton = null;
     
     // --- DOM ELEMENTS ---
     const seriesSelectorsContainer = document.getElementById('series-selectors');
@@ -38,9 +41,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const filteredRawData = allRawData.filter(d => d.location === FIXED_LOCATION && d.weighting === FIXED_WEIGHTING);
 
             for (const row of filteredRawData) {
-                if (!factorTimeSeriesData.has(row.name)) {
-                    factorTimeSeriesData.set(row.name, []);
-                }
+                if (!factorTimeSeriesData.has(row.name)) { factorTimeSeriesData.set(row.name, []); }
                 factorTimeSeriesData.get(row.name).push({ date: new Date(row.date), ret: row.ret });
             }
             factorTimeSeriesData.forEach(series => series.sort((a, b) => a.date - b.date));
@@ -48,6 +49,9 @@ document.addEventListener("DOMContentLoaded", function() {
             addSeriesRow();
             addSeriesBtn.addEventListener('click', addSeriesRow);
             plotBtn.addEventListener('click', handlePlotting);
+            
+            // NEW: Add a single event listener to the table for all play buttons (event delegation)
+            tableBody.addEventListener('click', handleAudioPlay);
 
         } catch (error) {
             console.error("Initialization failed:", error);
@@ -59,7 +63,6 @@ document.addEventListener("DOMContentLoaded", function() {
         const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
         const stats = {};
         let totalFactors = 0;
-        
         parsed.forEach(row => {
             if (row.Factor) {
                 stats[row.Factor] = row;
@@ -80,53 +83,20 @@ document.addEventListener("DOMContentLoaded", function() {
         updatePerformanceTable(selectedFactors);
     }
     
-    // --- THIS FUNCTION IS THE FIX ---
     function plotChart(selectedFactors) {
-        // Step 1: Create a master list of all unique dates from all selected series.
-        const allDates = new Set();
-        selectedFactors.forEach(name => {
-            const series = factorTimeSeriesData.get(name);
-            if (series) {
-                series.forEach(d => allDates.add(d.date.getTime()));
-            }
-        });
-        const masterDateArray = Array.from(allDates).sort((a, b) => a - b);
-
-        // Step 2: For each factor, build a dataset that aligns with the master date list.
         const datasets = selectedFactors.map(name => {
             const series = factorTimeSeriesData.get(name);
-            if (!series || series.length === 0) {
-                return null; // Safety net for factors with no time-series data at all
-            }
-
-            // Create a Map for fast lookups: date(in milliseconds) -> return
-            const returnMap = new Map(series.map(d => [d.date.getTime(), d.ret]));
-            
-            let cumulativeValue = null; // Start as null, becomes a number once data starts
-
-            const dataPoints = masterDateArray.map(dateMs => {
-                // Check if this factor has data for the current master date
-                if (returnMap.has(dateMs)) {
-                    // This is the first data point for this factor
-                    if (cumulativeValue === null) {
-                        cumulativeValue = 1; // Start the "growth of $1"
-                    }
-                    cumulativeValue *= (1 + returnMap.get(dateMs));
-                }
-                // The y-value is either the latest cumulative value or null if the series hasn't started
-                return { x: dateMs, y: cumulativeValue };
+            if (!series || series.length === 0) return null;
+            let cumulativeReturn = 1;
+            const dataPoints = series.map(d => {
+                cumulativeReturn *= (1 + d.ret);
+                return { x: d.date.getTime(), y: cumulativeReturn };
             });
-
             return {
-                label: nameMap.get(name) || name,
-                data: dataPoints,
-                borderColor: getRandomColor(),
-                fill: false, tension: 0.1, pointRadius: 0,
-                spanGaps: false // This tells Chart.js to create a break in the line for null values
+                label: nameMap.get(name) || name, data: dataPoints,
+                borderColor: getRandomColor(), fill: false, tension: 0.1, pointRadius: 0
             };
-        }).filter(Boolean); // Removes any nulls from factors that had no data
-
-        // Step 3: Render the chart
+        }).filter(Boolean);
         if (chart) chart.destroy();
         const ctx = document.getElementById('factorChart').getContext('2d');
         chart = new Chart(ctx, {
@@ -141,37 +111,101 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // --- PERFORMANCE TABLE (No changes here, but included for completeness) ---
+    // --- UPDATED PERFORMANCE TABLE FUNCTION ---
     function updatePerformanceTable(selectedFactors) {
         tableBody.innerHTML = '';
         selectedFactors.forEach(name => {
             const stats = allFactorStats.stats[name];
             if (!stats) {
-                console.warn(`No performance stats found for factor '${name}'. It will be skipped in the table.`);
+                console.warn(`No performance stats for factor '${name}'. Skipping in table.`);
                 return; 
             }
             const row = tableBody.insertRow();
             const total = allFactorStats.total;
             const formatCell = (value, rank, isPercent = false) => {
                 const displayValue = isPercent ? value.toFixed(2) + '%' : value.toFixed(2);
-                return `${displayValue} <span class="rank">(${rank}/${total})</span>`;
+                // Handle cases where rank might not exist (e.g., for AnnoyanceScore if some are null)
+                const rankText = rank ? `<span class="rank">(${rank}/${total})</span>` : '';
+                return `${displayValue} ${rankText}`;
             };
+            
+            // Construct the path to the audio file
+            const audioPath = `audio_portfolios/portfolio_${name}.wav`;
+
             row.innerHTML = `
                 <td>${nameMap.get(name) || name}</td>
                 <td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td>
                 <td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td>
                 <td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td>
+                <td>${formatCell(stats['AnnoyanceScore'], stats['AnnoyanceScore_rank'])}</td>
                 <td>${formatCell(stats['CAPM Alpha (Ann. %)'], stats['CAPM Alpha (Ann. %)_rank'])}</td>
                 <td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td>
+                <td>
+                    <button class="play-btn" data-audio-src="${audioPath}">Play</button>
+                </td>
             `;
         });
     }
 
-    // --- HELPER & UI SETUP FUNCTIONS (No changes needed) ---
+    // --- NEW: AUDIO HANDLING FUNCTION ---
+    function handleAudioPlay(event) {
+        const clickedButton = event.target;
+        // Only act if a play button was clicked
+        if (!clickedButton.classList.contains('play-btn')) return;
+
+        const audioSrc = clickedButton.dataset.audioSrc;
+
+        // --- Stop currently playing sound (if any) ---
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            if (currentlyPlayingButton) {
+                currentlyPlayingButton.textContent = 'Play';
+                currentlyPlayingButton.classList.remove('playing');
+            }
+        }
+
+        // --- Toggle logic: if clicking the same button that was playing, just stop it ---
+        if (clickedButton === currentlyPlayingButton) {
+            currentAudio = null;
+            currentlyPlayingButton = null;
+            return;
+        }
+
+        // --- Play new sound ---
+        currentAudio = new Audio(audioSrc);
+        currentlyPlayingButton = clickedButton;
+
+        currentAudio.play();
+        clickedButton.textContent = 'Stop';
+        clickedButton.classList.add('playing');
+        
+        // When the sound finishes on its own, reset the button
+        currentAudio.addEventListener('ended', () => {
+            if (currentlyPlayingButton === clickedButton) {
+                clickedButton.textContent = 'Play';
+                clickedButton.classList.remove('playing');
+                currentAudio = null;
+                currentlyPlayingButton = null;
+            }
+        });
+        
+        // Handle cases where the audio file might not be found
+        currentAudio.addEventListener('error', () => {
+            alert(`Error: Could not find or play audio file at:\n${audioSrc}`);
+            if (currentlyPlayingButton === clickedButton) {
+                clickedButton.textContent = 'Play';
+                clickedButton.classList.remove('playing');
+                currentAudio = null;
+                currentlyPlayingButton = null;
+            }
+        });
+    }
+
+    // --- HELPER & UI SETUP FUNCTIONS (No changes) ---
     function getSelectedFactors() {
         return Array.from(seriesSelectorsContainer.querySelectorAll('.factor-select')).map(sel => sel.value);
     }
-    
     function addSeriesRow() {
         if (seriesSelectorsContainer.children.length >= MAX_SERIES) return;
         const newRow = rowTemplate.cloneNode(true);
@@ -184,11 +218,8 @@ document.addEventListener("DOMContentLoaded", function() {
         newRow.querySelector('.remove-btn').addEventListener('click', () => newRow.remove());
         seriesSelectorsContainer.appendChild(newRow);
     }
-    
     function getRandomColor() {
-        const r = Math.floor(Math.random() * 200);
-        const g = Math.floor(Math.random() * 200);
-        const b = Math.floor(Math.random() * 200);
+        const r = Math.floor(Math.random() * 200), g = Math.floor(Math.random() * 200), b = Math.floor(Math.random() * 200);
         return `rgb(${r},${g},${b})`;
     }
 
