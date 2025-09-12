@@ -115,3 +115,26 @@ select, button {
     font-size: 0.9em;
     margin-left: 5px;
 }
+
+/* In style.css, add these new rules at the end */
+
+.play-btn {
+    padding: 8px 12px;
+    font-size: 14px;
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    min-width: 60px; /* Ensures buttons have same width */
+}
+
+.play-btn:hover {
+    background-color: #adb5bd;
+}
+
+/* This style will be applied by JavaScript when a sound is playing */
+.play-btn.playing {
+    background-color: #28a745; /* A green color for 'playing' state */
+    color: white;
+    border-color: #28a745;
+}
