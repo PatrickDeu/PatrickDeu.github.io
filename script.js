@@ -1,10 +1,15 @@
 document.addEventListener("DOMContentLoaded", function() {
+    // --- CONFIGURATION ---
+    const maxSeries = 5;
+    const FIXED_LOCATION = 'Developed Markets';
+    const FIXED_WEIGHTING = 'Capped Value Weighted';
+
     // --- GLOBAL VARIABLES ---
-    let chart; // Will hold the chart instance
-    let allData = []; // Will hold all parsed CSV data
-    const maxSeries = 5; // Set max number of series
+    let chart;
+    let filteredData = []; // Will hold the pre-filtered data
+    let uniqueFactorNames = []; // Will hold the list of factors for dropdowns
     
-    // Cache DOM elements
+    // --- CACHE DOM ELEMENTS ---
     const seriesSelectorsContainer = document.getElementById('series-selectors');
     const addSeriesBtn = document.getElementById('add-series-btn');
     const plotBtn = document.getElementById('plot-btn');
@@ -12,29 +17,37 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // --- INITIALIZATION ---
     async function init() {
-        // 1. Fetch and parse the CSV data
         try {
             const response = await fetch('data.csv');
             const csvText = await response.text();
-            allData = Papa.parse(csvText, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
-            console.log("Data loaded and parsed:", allData);
+            const allData = Papa.parse(csvText, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
+            
+            // ** CRITICAL STEP: Pre-filter the data **
+            filteredData = allData.filter(d => d.location === FIXED_LOCATION && d.weighting === FIXED_WEIGHTING);
+            
+            if (filteredData.length === 0) {
+                alert(`Error: No data found for the fixed settings (Location: ${FIXED_LOCATION}, Weighting: ${FIXED_WEIGHTING}). Please check your data.csv file.`);
+                return;
+            }
 
-            // 2. Add the first selector row automatically
-            addSeriesRow();
+            // Get unique factor names from the pre-filtered data
+            uniqueFactorNames = [...new Set(filteredData.map(item => item.name))].sort();
+            
+            console.log(`Loaded and pre-filtered data. Found ${uniqueFactorNames.length} unique factors.`);
 
-            // 3. Set up event listeners
+            addSeriesRow(); // Add the first selector row
+            
+            // --- EVENT LISTENERS ---
             addSeriesBtn.addEventListener('click', addSeriesRow);
             plotBtn.addEventListener('click', plotChart);
 
         } catch (error) {
-            console.error("Failed to load or parse data:", error);
-            alert("Error: Could not load data.csv. Please check the console for details.");
+            console.error("Failed to load or parse data.csv:", error);
+            alert("Error: Could not load data.csv. See console for details.");
         }
     }
 
-    // --- CORE FUNCTIONS ---
-
-    // Function to add a new row of dropdowns
+    // --- UI FUNCTIONS ---
     function addSeriesRow() {
         const currentRows = seriesSelectorsContainer.getElementsByClassName('series-row').length;
         if (currentRows >= maxSeries) {
@@ -42,15 +55,12 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        // Clone the template
         const newRow = rowTemplate.cloneNode(true);
         newRow.removeAttribute('id');
         newRow.style.display = 'grid';
 
-        // Populate its dropdowns
-        populateDropdowns(newRow);
+        populateFactorDropdown(newRow.querySelector('.factor-select'));
 
-        // Add event listener for the new remove button
         newRow.querySelector('.remove-btn').addEventListener('click', () => {
             newRow.remove();
             updateAddButtonState();
@@ -60,116 +70,81 @@ document.addEventListener("DOMContentLoaded", function() {
         updateAddButtonState();
     }
     
-    // Function to populate the select options based on unique values in the data
-    function populateDropdowns(rowElement) {
-        const unique = {
-            location: [...new Set(allData.map(item => item.location))],
-            name: [...new Set(allData.map(item => item.name))],
-            weighting: [...new Set(allData.map(item => item.weighting))]
-        };
-        
-        const locationSelect = rowElement.querySelector('.location-select');
-        const nameSelect = rowElement.querySelector('.name-select');
-        const weightingSelect = rowElement.querySelector('.weighting-select');
-        
-        unique.location.forEach(val => locationSelect.add(new Option(val, val)));
-        unique.name.forEach(val => nameSelect.add(new Option(val, val)));
-        unique.weighting.forEach(val => weightingSelect.add(new Option(val, val)));
+    function populateFactorDropdown(selectElement) {
+        uniqueFactorNames.forEach(name => {
+            selectElement.add(new Option(name, name));
+        });
     }
     
-    // Disable or enable the "Add" button based on the count
     function updateAddButtonState() {
         const currentRows = seriesSelectorsContainer.getElementsByClassName('series-row').length;
         addSeriesBtn.disabled = currentRows >= maxSeries;
     }
 
-    // Main function to filter data and draw the chart
+    // --- CHARTING FUNCTION ---
     function plotChart() {
         const selectedSeriesRows = seriesSelectorsContainer.querySelectorAll('.series-row');
         if (selectedSeriesRows.length === 0) {
-            alert("Please add at least one time series to plot.");
+            alert("Please add at least one factor to plot.");
             return;
         }
 
         const chartDatasets = [];
-        let allLabels = new Set(); // Use a Set to collect all unique dates
+        const allDates = new Set();
 
         selectedSeriesRows.forEach(row => {
-            // Get user selections from the dropdowns in this row
-            const selLocation = row.querySelector('.location-select').value;
-            const selName = row.querySelector('.name-select').value;
-            const selWeighting = row.querySelector('.weighting-select').value;
-
-            // Filter the master data to find the matching time series
-            let seriesData = allData
-                .filter(d => d.location === selLocation && d.name === selName && d.weighting === selWeighting)
-                .sort((a, b) => new Date(a.date) - new Date(b.date)); // Ensure data is sorted by date
+            const selectedFactorName = row.querySelector('.factor-select').value;
+            
+            // Filter the already-filtered data for the chosen factor name
+            const seriesData = filteredData
+                .filter(d => d.name === selectedFactorName)
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
 
             if (seriesData.length > 0) {
-                // Calculate cumulative returns (growth of $1)
                 let cumulativeReturn = 1;
-                const cumulativeData = seriesData.map(d => {
+                const plotPoints = seriesData.map(d => {
+                    allDates.add(d.date);
                     cumulativeReturn *= (1 + d.ret);
-                    return cumulativeReturn;
+                    return { x: d.date, y: cumulativeReturn };
                 });
-                
-                const dates = seriesData.map(d => d.date);
-                dates.forEach(date => allLabels.add(date)); // Add dates to the master set
 
-                // Prepare the dataset for Chart.js
-                const seriesLabel = `${selLocation} - ${selName} (${selWeighting})`;
                 chartDatasets.push({
-                    label: seriesLabel,
-                    data: cumulativeData,
+                    label: selectedFactorName,
+                    data: plotPoints,
                     borderColor: getRandomColor(),
                     fill: false,
                     tension: 0.1,
-                    pointRadius: 0 // Hide points for a cleaner line
+                    pointRadius: 0
                 });
             }
         });
         
-        // Destroy previous chart instance if it exists
-        if (chart) {
-            chart.destroy();
-        }
+        if (chart) chart.destroy();
 
-        // Create the new chart
-        const ctx = document.getElementById('myChart').getContext('2d');
+        const ctx = document.getElementById('factorChart').getContext('2d');
         chart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: Array.from(allLabels).sort((a, b) => new Date(a) - new Date(b)), // Sort all dates chronologically
                 datasets: chartDatasets
             },
             options: {
                 responsive: true,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
+                interaction: { mode: 'index', intersect: false },
                 scales: {
-                    y: {
-                        type: 'logarithmic', // Log scale is best for long-term growth charts
-                        title: { display: true, text: 'Growth of $1 (Log Scale)' }
-                    },
                     x: {
+                        type: 'time',
+                        time: { unit: 'year' },
                         title: { display: true, text: 'Date' }
+                    },
+                    y: {
+                        type: 'logarithmic',
+                        title: { display: true, text: 'Growth of $1 (Log Scale)' }
                     }
                 },
                 plugins: {
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                if (context.parsed.y !== null) {
-                                    label += context.parsed.y.toFixed(2);
-                                }
-                                return label;
-                            }
+                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}`
                         }
                     }
                 }
@@ -177,14 +152,11 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
     
-    // Helper function to generate random colors for the lines
     function getRandomColor() {
-        const letters = '0123456789ABCDEF';
-        let color = '#';
-        for (let i = 0; i < 6; i++) {
-            color += letters[Math.floor(Math.random() * 16)];
-        }
-        return color;
+        const r = Math.floor(Math.random() * 200);
+        const g = Math.floor(Math.random() * 200);
+        const b = Math.floor(Math.random() * 200);
+        return `rgb(${r}, ${g}, ${b})`;
     }
 
     // Start the application
