@@ -2,10 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>My Awesome Site</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Factor Plotter</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Hello, World!</h1>
-    <p>Welcome to my new website, hosted on GitHub Pages.</p>
+
+    <div class="container">
+        <!-- Controls Section -->
+        <div class="card controls-card">
+            <div class="controls-header">
+                <span>REGION/COUNTRY</span>
+                <span>THEME/FACTOR</span>
+                <span>WEIGHTING</span>
+            </div>
+            <div id="series-selectors">
+                <!-- Selector rows will be dynamically added here -->
+            </div>
+            <div class="action-buttons">
+                <button id="add-series-btn">+ Add Time Series</button>
+                <button id="plot-btn">Plot</button>
+            </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="card chart-card">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Hidden template for a single series selector row -->
+    <div id="series-row-template" class="series-row" style="display: none;">
+        <select class="location-select"></select>
+        <select class="name-select"></select>
+        <select class="weighting-select"></select>
+        <button class="remove-btn">× Remove</button>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+
 </body>
 </html>
