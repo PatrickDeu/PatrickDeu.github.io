@@ -1,8 +1,8 @@
 document.addEventListener("DOMContentLoaded", function() {
     // --- CONFIGURATION ---
     const MAX_SERIES = 5;
-    const FIXED_LOCATION = 'Developed Markets';
-    const FIXED_WEIGHTING = 'Capped Value Weighted';
+    const FIXED_LOCATION = 'developed'; // <-- CORRECTED
+    const FIXED_WEIGHTING = 'vw_cap'; // <-- CORRECTED
     const PERIODS_PER_YEAR = 12; // Monthly data
 
     // --- GLOBAL VARIABLES ---
