@@ -1,93 +1,124 @@
-/* Basic Setup */
+/* Basic Setup & Fonts */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f4f7fa;
-    color: #333;
-    margin: 20px;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: #f8f9fa;
+    color: #212529;
+    margin: 0;
 }
 
 .container {
-    max-width: 1200px;
-    margin: auto;
+    max-width: 1100px;
+    margin: 40px auto;
+    padding: 0 20px;
 }
 
+/* Header and Navigation */
+.site-header {
+    background-color: #fff;
+    padding: 20px 40px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.site-header h1 {
+    font-size: 2.5em;
+    text-align: center;
+    margin: 0 0 20px 0;
+    font-weight: 300;
+    letter-spacing: 2px;
+}
+
+.main-nav {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+}
+
+.main-nav a {
+    text-decoration: none;
+    color: #495057;
+    font-size: 1.1em;
+    padding-bottom: 5px;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.main-nav a:hover {
+    color: #000;
+}
+
+.main-nav a.active {
+    color: #000;
+    font-weight: bold;
+    border-bottom: 2px solid #007bff;
+}
+
+/* Card Styling */
 .card {
     background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    padding: 20px;
-    margin-bottom: 20px;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    padding: 25px;
+    margin-bottom: 25px;
 }
 
 /* Controls Section */
 .controls-header {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    background-color: #000;
+    color: #fff;
+    padding: 15px 25px;
+    margin: -25px -25px 20px -25px;
+    border-radius: 6px 6px 0 0;
     font-weight: bold;
-    color: #555;
-    margin-bottom: 10px;
-    padding: 0 10px;
 }
 
 .series-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr auto;
+    grid-template-columns: 1fr auto;
     gap: 15px;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
 }
 
 select, button {
-    padding: 10px;
+    padding: 12px;
     border-radius: 5px;
-    border: 1px solid #ccc;
-    font-size: 14px;
+    border: 1px solid #ced4da;
+    font-size: 16px;
     cursor: pointer;
-}
-
-button {
-    background-color: #f0f0f0;
-    transition: background-color 0.2s;
-}
-
-button:hover {
-    background-color: #e0e0e0;
+    background-color: #fff;
 }
 
 .action-buttons {
     margin-top: 20px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid #e9ecef;
     padding-top: 20px;
 }
 
 #add-series-btn {
-    border-style: dashed;
+    border-style: solid;
+    border-color: #adb5bd;
+    color: #495057;
 }
 
 #plot-btn {
-    background-color: #007bff;
-    color: white;
+    background-color: #fff;
+    color: #212529;
+    border: 1px solid #212529;
     font-weight: bold;
-    border-color: #007bff;
 }
 
 #plot-btn:hover {
-    background-color: #0056b3;
+    background-color: #212529;
+    color: #fff;
 }
 
 .remove-btn {
     background-color: transparent;
-    border: 1px solid #ff4d4d;
-    color: #ff4d4d;
-    padding: 8px 12px;
+    border: 1px solid #dc3545;
+    color: #dc3545;
 }
 
 .remove-btn:hover {
-    background-color: #ff4d4d;
+    background-color: #dc3545;
     color: white;
-}
-
-/* Chart Section */
-.chart-card {
-    padding: 30px;
 }
