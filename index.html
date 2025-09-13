@@ -66,22 +66,9 @@
 
         <!-- =========== ANALYSIS SECTION (Initially hidden) =========== -->
         <section id="analysis" class="page-section" style="display: none;">
-            <div class="card controls-card">
-                <div class="controls-header"><span>FACTORS</span></div>
-                <div id="series-selectors"></div>
-                <div class="action-buttons">
-                    <button id="add-series-btn">+ Add Time Series</button>
-                    <button id="plot-btn">Analyze</button>
-                </div>
-            </div>
 
-            <div class="card chart-card">
-                <canvas id="factorChart"></canvas>
-            </div>
-
-            <div id="howto-modal" class="modal-overlay modal-hidden">
-              <div class="modal-content">
-                <span class="close-btn">&times;</span>
+            <div id="howto-container" class="card">
+                <span id="close-howto-btn" class="close-btn">&times;</span>
                 <h2>How to Analyze Factors</h2>
                 <p>
                   This site allows you to compare the historical performance of up to five factor portfolios.
@@ -94,11 +81,22 @@
                 <p>
                   A chart will be generated showing the cumulative wealth time series. Below the chart, a table will display detailed performance metrics for your selected portfolios, along with an additional button to play the sonified factor portfolios.
                 </p>
-              </div>
+            </div>
+            
+            <div class="card controls-card">
+                <div class="controls-header"><span>FACTORS</span></div>
+                <div id="series-selectors"></div>
+                <div class="action-buttons">
+                    <button id="add-series-btn">+ Add Time Series</button>
+                    <button id="plot-btn">Analyze</button>
+                </div>
             </div>
 
-
-            <div class="card table-card">
+            <!-- These result cards are now hidden by default -->
+            <div id="analysis-chart-card" class="card chart-card results-hidden">
+                <canvas id="factorChart"></canvas>
+            </div>
+            <div id="analysis-table-card" class="card table-card results-hidden">
                 <div class="table-wrapper">
                     <table id="performance-table">
                         <thead>
