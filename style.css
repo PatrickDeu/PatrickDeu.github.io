@@ -43,7 +43,6 @@ body {
     border-bottom: 2px solid #000;
 }
 
-/* Card Styling */
 .card {
     background: #ffffff;
     border-radius: 6px;
@@ -52,7 +51,6 @@ body {
     margin-bottom: 25px;
 }
 
-/* Controls Section (same as before) */
 .controls-header {
     background-color: #000;
     color: #fff;
@@ -108,6 +106,8 @@ select, button {
 #performance-table th {
     background-color: #f8f9fa;
     font-weight: bold;
+    text-align: center;
+    vertical-align: middle; 
 }
 
 .rank {
@@ -115,8 +115,6 @@ select, button {
     font-size: 0.9em;
     margin-left: 5px;
 }
-
-/* In style.css, add these new rules at the end */
 
 .play-btn {
     padding: 8px 12px;
@@ -132,9 +130,17 @@ select, button {
     background-color: #adb5bd;
 }
 
-/* This style will be applied by JavaScript when a sound is playing */
 .play-btn.playing {
-    background-color: #28a745; /* A green color for 'playing' state */
+    background-color: #28a745; /* green color for 'playing' state */
     color: white;
     border-color: #28a745;
 }
+
+
+.chart-card {
+    min-height: 500px; 
+    position: relative;
+    padding: 30px;
+}
+
+
