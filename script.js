@@ -1,21 +1,11 @@
 document.addEventListener("DOMContentLoaded", function() {
-    // --- CONFIGURATION ---
+    // --- CONFIGURATION & GLOBAL VARIABLES ---
     const MAX_SERIES = 5;
     const FIXED_LOCATION = 'developed';
     const FIXED_WEIGHTING = 'vw_cap';
-
-    // --- GLOBAL VARIABLES ---
-    let chart;
-    let factorTimeSeriesData = new Map();
-    let nameMap = new Map();
-    let allFactorStats = [];
+    let chart, allFactorStats = [], factorTimeSeriesData = new Map(), nameMap = new Map();
     const audioPlayer = new Audio();
-    let currentlyPlayingButton = null;
-    let currentSortKey = 'Sharpe Ratio';
-    let currentSortDirection = 'desc';
-    
-    // NEW: Flag to show the "How-to" modal only once per session
-    let hasShownHowto = false;
+    let currentlyPlayingButton = null, currentSortKey = 'Sharpe Ratio', currentSortDirection = 'desc';
 
     // --- DOM ELEMENTS ---
     const mainContainer = document.querySelector('main.container');
@@ -28,17 +18,18 @@ document.addEventListener("DOMContentLoaded", function() {
     const analysisTableBody = document.querySelector("#performance-table tbody");
     const topFactorsTable = document.getElementById('top-factors-table');
     const topFactorsTableBody = topFactorsTable.querySelector('tbody');
-    // NEW: Get modal elements
-    const howtoModal = document.getElementById('howto-modal');
-
+    // NEW: Get "How-to" and result card elements
+    const howtoContainer = document.getElementById('howto-container');
+    const closeHowtoBtn = document.getElementById('close-howto-btn');
+    const analysisChartCard = document.getElementById('analysis-chart-card');
+    const analysisTableCard = document.getElementById('analysis-table-card');
+    
     // --- INITIALIZATION ---
     async function init() {
         try {
-            // Data loading... (no changes here)
             const [rawDataResponse, namesResponse, statsResponse] = await Promise.all([
                 fetch('data.csv'), fetch('factor_names.csv'), fetch('factor_stats.csv')
             ]);
-            
             const statsText = await statsResponse.text();
             loadPrecomputedStats(statsText);
             const namesText = await namesResponse.text();
@@ -52,15 +43,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 factorTimeSeriesData.get(row.name).push({ date: new Date(row.date), ret: row.ret });
             }
             factorTimeSeriesData.forEach(series => series.sort((a, b) => a.date - b.date));
-            
             addSeriesRow();
             renderTopFactorsTable();
             setupEventListeners();
-
-        } catch (error) {
-            console.error("Initialization failed:", error);
-            alert("Error loading or processing data. Please check console for details.");
-        }
+        } catch (error) { console.error("Initialization failed:", error); alert("Error loading data."); }
     }
 
     function setupEventListeners() {
@@ -70,123 +56,34 @@ document.addEventListener("DOMContentLoaded", function() {
         topFactorsTable.querySelector('thead').addEventListener('click', handleSortClick);
         mainContainer.addEventListener('click', handleAudioPlay);
         audioPlayer.addEventListener('ended', resetAudioButton);
-        audioPlayer.addEventListener('error', () => {
-            alert(`Error: Could not find or play the requested audio file.`);
-            resetAudioButton();
-        });
-        
-        // NEW: Event listeners for closing the modal
-        howtoModal.querySelector('.close-btn').addEventListener('click', hideHowtoModal);
-        howtoModal.addEventListener('click', (event) => {
-            if (event.target === howtoModal) { // Click on overlay background
-                hideHowtoModal();
-            }
-        });
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && !howtoModal.classList.contains('modal-hidden')) {
-                hideHowtoModal();
-            }
+        audioPlayer.addEventListener('error', () => { alert(`Audio file error.`); resetAudioButton(); });
+        // NEW: Event listener to close the "How-to" guide
+        closeHowtoBtn.addEventListener('click', () => {
+            howtoContainer.style.display = 'none';
         });
     }
 
-    // --- NEW: MODAL VISIBILITY FUNCTIONS ---
-    function showHowtoModal() {
-        howtoModal.classList.remove('modal-hidden');
-    }
-    function hideHowtoModal() {
-        howtoModal.classList.add('modal-hidden');
-    }
-
-    // --- UPDATED NAVIGATION LOGIC ---
     function handleNavClick(event) {
         event.preventDefault();
         const targetId = event.target.dataset.target;
-        
-        pageSections.forEach(section => {
-            section.style.display = section.id === targetId ? 'block' : 'none';
-        });
-        
-        navLinks.forEach(link => {
-            link.classList.toggle('active', link.dataset.target === targetId);
-        });
-
-        // Show the "How-to" modal the first time the user navigates to the analysis page
-        if (targetId === 'analysis' && !hasShownHowto) {
-            showHowtoModal();
-            hasShownHowto = true; // Set flag so it doesn't show again
-        }
+        pageSections.forEach(section => section.style.display = section.id === targetId ? 'block' : 'none');
+        navLinks.forEach(link => link.classList.toggle('active', link.dataset.target === targetId));
     }
 
-    // --- ALL OTHER FUNCTIONS REMAIN THE SAME ---
-    function handleSortClick(event) {
-        const header = event.target.closest('th');
-        if (!header || !header.classList.contains('sortable-header')) return;
-        const newSortKey = header.dataset.sortKey;
-        if (newSortKey === currentSortKey) {
-            currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
-        } else {
-            currentSortKey = newSortKey;
-            currentSortDirection = 'desc';
-        }
-        renderTopFactorsTable();
-    }
-    function renderTopFactorsTable() {
-        const sortedStats = [...allFactorStats].sort((a, b) => {
-            let valA = a[currentSortKey]; let valB = b[currentSortKey];
-            const direction = ['Volatility (Ann. %)', 'AnnoyanceScore'].includes(currentSortKey) ? -1 : 1;
-            if (currentSortDirection === 'asc') { return (valA - valB) * direction; } 
-            else { return (valB - valA) * direction; }
-        });
-        const top5 = sortedStats.slice(0, 5);
-        const total = allFactorStats.length;
-        const formatCell = (value, rank, isPercent = false) => {
-            const displayValue = isPercent ? value.toFixed(2) + '%' : value.toFixed(2);
-            const rankText = rank ? `<br><span class="rank">(${rank}/${total})</span>` : '';
-            return `${displayValue}${rankText}`;
-        };
-        topFactorsTableBody.innerHTML = top5.map(stats => {
-            const factorName = stats.Factor;
-            const audioPath = `audio_portfolios/portfolio_${factorName}.wav`;
-            return `<tr><td>${nameMap.get(factorName) || factorName}</td><td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td><td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td><td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td><td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td><td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td><td><button class="play-btn" data-audio-src="${audioPath}">Play</button></td></tr>`;
-        }).join('');
-        document.querySelectorAll('#top-factors-table .sortable-header').forEach(th => {
-            th.classList.remove('asc', 'desc');
-            if (th.dataset.sortKey === currentSortKey) { th.classList.add(currentSortDirection); }
-        });
-    }
-    function handleAudioPlay(event) {
-        const clickedButton = event.target.closest('.play-btn');
-        if (!clickedButton) return;
-        const audioSrc = clickedButton.dataset.audioSrc;
-        if (clickedButton === currentlyPlayingButton) {
-            audioPlayer.pause();
-            resetAudioButton();
-        } else {
-            if (currentlyPlayingButton) resetAudioButton();
-            audioPlayer.src = audioSrc;
-            audioPlayer.play();
-            clickedButton.textContent = 'Stop';
-            clickedButton.classList.add('playing');
-            currentlyPlayingButton = clickedButton;
-        }
-    }
-    function resetAudioButton() {
-        if (currentlyPlayingButton) {
-            currentlyPlayingButton.textContent = 'Play';
-            currentlyPlayingButton.classList.remove('playing');
-            currentlyPlayingButton = null;
-        }
-    }
-    function loadPrecomputedStats(csvText) {
-        const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
-        allFactorStats = parsed.filter(row => row.Factor); 
-    }
+    // --- ANALYSIS PAGE LOGIC: PLOTTING & SHOWING RESULTS ---
     function handlePlotting() {
         const selectedFactors = getSelectedFactors();
         if (selectedFactors.length === 0) { alert("Please select at least one factor."); return; }
+        
+        // NEW: Show the result containers before plotting/updating
+        analysisChartCard.classList.remove('results-hidden');
+        analysisTableCard.classList.remove('results-hidden');
+
         plotChart(selectedFactors);
         updateAnalysisTable(selectedFactors);
     }
+    
+    // --- ALL OTHER FUNCTIONS REMAIN THE SAME ---
     function plotChart(selectedFactors) {
         const allDates = new Set();
         selectedFactors.forEach(name => {
@@ -253,6 +150,69 @@ document.addEventListener("DOMContentLoaded", function() {
             row.innerHTML = `<td>${nameMap.get(name) || name}</td><td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td><td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td><td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td><td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td><td>${formatCell(stats['CAPM Alpha (Ann. %)'], stats['CAPM Alpha (Ann. %)_rank'])}</td><td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td><td><button class="play-btn" data-audio-src="audio_portfolios/portfolio_${name}.wav">Play</button></td>`;
         });
     }
+    function handleSortClick(event) {
+        const header = event.target.closest('th');
+        if (!header || !header.classList.contains('sortable-header')) return;
+        const newSortKey = header.dataset.sortKey;
+        if (newSortKey === currentSortKey) {
+            currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
+        } else {
+            currentSortKey = newSortKey;
+            currentSortDirection = 'desc';
+        }
+        renderTopFactorsTable();
+    }
+    function renderTopFactorsTable() {
+        const sortedStats = [...allFactorStats].sort((a, b) => {
+            let valA = a[currentSortKey]; let valB = b[currentSortKey];
+            const direction = ['Volatility (Ann. %)', 'AnnoyanceScore'].includes(currentSortKey) ? -1 : 1;
+            if (currentSortDirection === 'asc') { return (valA - valB) * direction; } 
+            else { return (valB - valA) * direction; }
+        });
+        const top5 = sortedStats.slice(0, 5);
+        const total = allFactorStats.length;
+        const formatCell = (value, rank, isPercent = false) => {
+            const displayValue = isPercent ? value.toFixed(2) + '%' : value.toFixed(2);
+            const rankText = rank ? `<br><span class="rank">(${rank}/${total})</span>` : '';
+            return `${displayValue}${rankText}`;
+        };
+        topFactorsTableBody.innerHTML = top5.map(stats => {
+            const factorName = stats.Factor;
+            const audioPath = `audio_portfolios/portfolio_${factorName}.wav`;
+            return `<tr><td>${nameMap.get(factorName) || factorName}</td><td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td><td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td><td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td><td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td><td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td><td><button class="play-btn" data-audio-src="${audioPath}">Play</button></td></tr>`;
+        }).join('');
+        document.querySelectorAll('#top-factors-table .sortable-header').forEach(th => {
+            th.classList.remove('asc', 'desc');
+            if (th.dataset.sortKey === currentSortKey) { th.classList.add(currentSortDirection); }
+        });
+    }
+    function handleAudioPlay(event) {
+        const clickedButton = event.target.closest('.play-btn');
+        if (!clickedButton) return;
+        const audioSrc = clickedButton.dataset.audioSrc;
+        if (clickedButton === currentlyPlayingButton) {
+            audioPlayer.pause();
+            resetAudioButton();
+        } else {
+            if (currentlyPlayingButton) resetAudioButton();
+            audioPlayer.src = audioSrc;
+            audioPlayer.play();
+            clickedButton.textContent = 'Stop';
+            clickedButton.classList.add('playing');
+            currentlyPlayingButton = clickedButton;
+        }
+    }
+    function resetAudioButton() {
+        if (currentlyPlayingButton) {
+            currentlyPlayingButton.textContent = 'Play';
+            currentlyPlayingButton.classList.remove('playing');
+            currentlyPlayingButton = null;
+        }
+    }
+    function loadPrecomputedStats(csvText) {
+        const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
+        allFactorStats = parsed.filter(row => row.Factor); 
+    }
     function getSelectedFactors() {
         return Array.from(seriesSelectorsContainer.querySelectorAll('.factor-select')).map(sel => sel.value);
     }
@@ -273,6 +233,5 @@ document.addEventListener("DOMContentLoaded", function() {
         return `rgb(${r},${g},${b})`;
     }
 
-    // --- START THE APP ---
     init();
 });
