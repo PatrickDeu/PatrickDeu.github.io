@@ -13,6 +13,9 @@ document.addEventListener("DOMContentLoaded", function() {
     let currentlyPlayingButton = null;
     let currentSortKey = 'Sharpe Ratio';
     let currentSortDirection = 'desc';
+    
+    // NEW: Flag to show the "How-to" modal only once per session
+    let hasShownHowto = false;
 
     // --- DOM ELEMENTS ---
     const mainContainer = document.querySelector('main.container');
@@ -25,10 +28,13 @@ document.addEventListener("DOMContentLoaded", function() {
     const analysisTableBody = document.querySelector("#performance-table tbody");
     const topFactorsTable = document.getElementById('top-factors-table');
     const topFactorsTableBody = topFactorsTable.querySelector('tbody');
+    // NEW: Get modal elements
+    const howtoModal = document.getElementById('howto-modal');
 
     // --- INITIALIZATION ---
     async function init() {
         try {
+            // Data loading... (no changes here)
             const [rawDataResponse, namesResponse, statsResponse] = await Promise.all([
                 fetch('data.csv'), fetch('factor_names.csv'), fetch('factor_stats.csv')
             ]);
@@ -68,15 +74,50 @@ document.addEventListener("DOMContentLoaded", function() {
             alert(`Error: Could not find or play the requested audio file.`);
             resetAudioButton();
         });
+        
+        // NEW: Event listeners for closing the modal
+        howtoModal.querySelector('.close-btn').addEventListener('click', hideHowtoModal);
+        howtoModal.addEventListener('click', (event) => {
+            if (event.target === howtoModal) { // Click on overlay background
+                hideHowtoModal();
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !howtoModal.classList.contains('modal-hidden')) {
+                hideHowtoModal();
+            }
+        });
     }
 
+    // --- NEW: MODAL VISIBILITY FUNCTIONS ---
+    function showHowtoModal() {
+        howtoModal.classList.remove('modal-hidden');
+    }
+    function hideHowtoModal() {
+        howtoModal.classList.add('modal-hidden');
+    }
+
+    // --- UPDATED NAVIGATION LOGIC ---
     function handleNavClick(event) {
         event.preventDefault();
         const targetId = event.target.dataset.target;
-        pageSections.forEach(section => section.style.display = section.id === targetId ? 'block' : 'none');
-        navLinks.forEach(link => link.classList.toggle('active', link.dataset.target === targetId));
+        
+        pageSections.forEach(section => {
+            section.style.display = section.id === targetId ? 'block' : 'none';
+        });
+        
+        navLinks.forEach(link => {
+            link.classList.toggle('active', link.dataset.target === targetId);
+        });
+
+        // Show the "How-to" modal the first time the user navigates to the analysis page
+        if (targetId === 'analysis' && !hasShownHowto) {
+            showHowtoModal();
+            hasShownHowto = true; // Set flag so it doesn't show again
+        }
     }
 
+    // --- ALL OTHER FUNCTIONS REMAIN THE SAME ---
     function handleSortClick(event) {
         const header = event.target.closest('th');
         if (!header || !header.classList.contains('sortable-header')) return;
@@ -89,7 +130,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         renderTopFactorsTable();
     }
-
     function renderTopFactorsTable() {
         const sortedStats = [...allFactorStats].sort((a, b) => {
             let valA = a[currentSortKey]; let valB = b[currentSortKey];
@@ -107,24 +147,13 @@ document.addEventListener("DOMContentLoaded", function() {
         topFactorsTableBody.innerHTML = top5.map(stats => {
             const factorName = stats.Factor;
             const audioPath = `audio_portfolios/portfolio_${factorName}.wav`;
-            return `
-                <tr>
-                    <td>${nameMap.get(factorName) || factorName}</td>
-                    <td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td>
-                    <td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td>
-                    <td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td>
-                    <td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td>
-                    <td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td>
-                    <td><button class="play-btn" data-audio-src="${audioPath}">Play</button></td>
-                </tr>
-            `;
+            return `<tr><td>${nameMap.get(factorName) || factorName}</td><td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td><td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td><td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td><td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td><td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td><td><button class="play-btn" data-audio-src="${audioPath}">Play</button></td></tr>`;
         }).join('');
         document.querySelectorAll('#top-factors-table .sortable-header').forEach(th => {
             th.classList.remove('asc', 'desc');
             if (th.dataset.sortKey === currentSortKey) { th.classList.add(currentSortDirection); }
         });
     }
-
     function handleAudioPlay(event) {
         const clickedButton = event.target.closest('.play-btn');
         if (!clickedButton) return;
@@ -158,8 +187,6 @@ document.addEventListener("DOMContentLoaded", function() {
         plotChart(selectedFactors);
         updateAnalysisTable(selectedFactors);
     }
-    
-    // --- THIS FUNCTION CONTAINS THE PLOT FIX ---
     function plotChart(selectedFactors) {
         const allDates = new Set();
         selectedFactors.forEach(name => {
@@ -191,12 +218,7 @@ document.addEventListener("DOMContentLoaded", function() {
             type: 'line', data: { datasets },
             options: {
                 responsive: true,
-                // FIX 3: MAINTAIN ASPECT RATIO
-                // This forces the chart to maintain its shape as it scales.
-                // A value of 1.7 is a good starting point (wider than tall).
-                // It also fixes the bug of the chart not growing back.
                 aspectRatio: 1.7, 
-                
                 interaction: { mode: 'index', intersect: false },
                 scales: {
                     x: { type: 'time', time: { unit: 'year', displayFormats: { year: 'yyyy' } }, title: { display: true, text: 'Date' }, grid: { display: false }, ticks: { maxTicksLimit: 7 } },
@@ -215,7 +237,6 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
-
     function updateAnalysisTable(selectedFactors) {
         analysisTableBody.innerHTML = '';
         const statsMap = new Map(allFactorStats.map(s => [s.Factor, s]));
@@ -229,16 +250,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const rankText = rank ? `<br><span class="rank">(${rank}/${total})</span>` : '';
                 return `${displayValue}${rankText}`;
             };
-            row.innerHTML = `
-                <td>${nameMap.get(name) || name}</td>
-                <td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td>
-                <td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td>
-                <td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td>
-                <td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td>
-                <td>${formatCell(stats['CAPM Alpha (Ann. %)'], stats['CAPM Alpha (Ann. %)_rank'])}</td>
-                <td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td>
-                <td><button class="play-btn" data-audio-src="audio_portfolios/portfolio_${name}.wav">Play</button></td>
-            `;
+            row.innerHTML = `<td>${nameMap.get(name) || name}</td><td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td><td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td><td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td><td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td><td>${formatCell(stats['CAPM Alpha (Ann. %)'], stats['CAPM Alpha (Ann. %)_rank'])}</td><td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td><td><button class="play-btn" data-audio-src="audio_portfolios/portfolio_${name}.wav">Play</button></td>`;
         });
     }
     function getSelectedFactors() {
