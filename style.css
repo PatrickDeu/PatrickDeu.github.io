@@ -32,14 +32,15 @@ body {
     padding: 25px;
     margin-bottom: 25px;
 }
-.chart-card { min-height: 500px; position: relative; padding: 30px; }
+/* REMOVED min-height from here, as aspectRatio will now control it */
+.chart-card { position: relative; padding: 30px; }
 
 /* Controls Section */
 .controls-header {
     background-color: #000;
     color: #fff;
     padding: 15px 25px;
-    margin: -25px -25px 20px -25px;
+    margin: -25px -25px 20px -25px; /* Negative margin for desktop */
     border-radius: 6px 6px 0 0;
     font-weight: bold;
 }
@@ -57,29 +58,18 @@ select, button {
 .remove-btn:hover { background-color: #dc3545; color: white; }
 
 /* Table Styles */
-.table-card table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 16px;
-    table-layout: fixed; 
-}
+.table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrapper table { min-width: 900px; }
+.table-card table { width: 100%; border-collapse: collapse; font-size: 16px; table-layout: fixed; }
 .table-card th, .table-card td { border: 1px solid #dee2e6; padding: 12px; }
 .table-card th { background-color: #f8f9fa; font-weight: bold; text-align: center; vertical-align: middle; }
 .table-card td { text-align: center; vertical-align: middle; }
 .table-card td:first-child { text-align: left; }
 .rank { color: #6c757d; font-size: 0.9em; }
-
-/* Fixed Column Widths */
 .table-card th:nth-child(1) { width: 26%; }
-.table-card th:nth-child(2),
-.table-card th:nth-child(3),
-.table-card th:nth-child(4),
-.table-card th:nth-child(5),
-.table-card th:nth-child(6),
-.table-card th:nth-child(7) { width: 11%; }
+.table-card th:nth-child(2), .table-card th:nth-child(3), .table-card th:nth-child(4),
+.table-card th:nth-child(5), .table-card th:nth-child(6), .table-card th:nth-child(7) { width: 11%; }
 .table-card th:nth-child(8) { width: 9%; }
-
-/* "About" Page Table Sorting */
 .sortable-header { cursor: pointer; transition: background-color 0.2s; }
 .sortable-header:hover { background-color: #e9ecef; }
 .sortable-header::after { content: ''; display: inline-block; margin-left: 5px; opacity: 0.4; }
@@ -95,53 +85,29 @@ select, button {
 .play-btn:hover { background-color: #adb5bd; }
 .play-btn.playing { background-color: #28a745; color: white; border-color: #28a745; }
 
-/* horizontal scrolling for tables */
-.table-wrapper {
-    overflow-x: auto; /* This is the magic property! */
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-}
-/* minimum width for table */
-.table-wrapper table {
-    min-width: 900px;
-}
 
-
+/* =========== RESPONSIVE DESIGN FOR MOBILE =========== */
 @media (max-width: 768px) {
-    /* Reduce overall spacing and font sizes */
-    body {
-        font-size: 14px;
-    }
-    .container {
-        margin: 20px auto;
-        padding: 0 10px;
-    }
-    .card {
-        padding: 15px;
+    body { font-size: 14px; }
+    .container { margin: 20px auto; padding: 0 10px; }
+    .card { padding: 15px; }
+    .site-header h1 { font-size: 1.8em; }
+    .main-nav a { font-size: 1em; margin: 0 10px; }
+    select, button { font-size: 14px; padding: 10px; }
+    .table-card table { font-size: 14px; }
+    .table-card th, .table-card td { padding: 10px; }
+
+    .controls-header {
+        margin: -15px -15px 15px -15px;
     }
 
-    /* Make header smaller */
-    .site-header h1 {
-        font-size: 1.8em;
-    }
-    .main-nav a {
-        font-size: 1em;
-        margin: 0 10px;
-    }
-
-    /* Make controls smaller to fit on screen */
-    select, button {
-        font-size: 14px;
-        padding: 10px;
-    }
     .series-row {
+        display: flex;
         gap: 10px;
+        align-items: center;
     }
-
-    /* Make table fonts slightly smaller */
-    .table-card table {
-        font-size: 14px;
-    }
-    .table-card th, .table-card td {
-        padding: 10px;
+    .series-row .factor-select {
+        flex-grow: 1; /* Allows the select box to take up available space */
+        min-width: 0; /* A flexbox trick to prevent overflow */
     }
 }
