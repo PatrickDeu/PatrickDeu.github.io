@@ -8,20 +8,30 @@ document.addEventListener("DOMContentLoaded", function() {
     let chart;
     let factorTimeSeriesData = new Map();
     let nameMap = new Map();
-    let allFactorStats = {};
+    let allFactorStats = {}; // Will be an array of objects
     const audioPlayer = new Audio();
     let currentlyPlayingButton = null;
     
+    // State for the interactive Top/Flop table
+    let currentSortKey = 'Sharpe Ratio';
+    let currentSortDirection = 'desc';
+
     // --- DOM ELEMENTS ---
+    const mainContainer = document.querySelector('main.container');
+    const navLinks = document.querySelectorAll('.nav-link');
+    const pageSections = document.querySelectorAll('.page-section');
     const seriesSelectorsContainer = document.getElementById('series-selectors');
     const addSeriesBtn = document.getElementById('add-series-btn');
     const plotBtn = document.getElementById('plot-btn');
     const rowTemplate = document.getElementById('series-row-template');
-    const tableBody = document.querySelector("#performance-table tbody");
+    const analysisTableBody = document.querySelector("#performance-table tbody");
+    const topFactorsTable = document.getElementById('top-factors-table');
+    const topFactorsTableBody = topFactorsTable.querySelector('tbody');
 
     // --- INITIALIZATION ---
     async function init() {
         try {
+            // Data Loading...
             const [rawDataResponse, namesResponse, statsResponse] = await Promise.all([
                 fetch('data.csv'),
                 fetch('factor_names.csv'),
@@ -42,11 +52,12 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             factorTimeSeriesData.forEach(series => series.sort((a, b) => a.date - b.date));
             
-            setupAudioPlayerListeners();
+            // Initial UI Setup
             addSeriesRow();
-            addSeriesBtn.addEventListener('click', addSeriesRow);
-            plotBtn.addEventListener('click', handlePlotting);
-            tableBody.addEventListener('click', handleAudioPlay);
+            renderTopFactorsTable(); // Render the default Top 5 Sharpe table
+            
+            // Event Listeners
+            setupEventListeners();
 
         } catch (error) {
             console.error("Initialization failed:", error);
@@ -54,38 +65,116 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    function setupAudioPlayerListeners() {
-        audioPlayer.addEventListener('ended', () => {
-            if (currentlyPlayingButton) {
-                currentlyPlayingButton.textContent = 'Play';
-                currentlyPlayingButton.classList.remove('playing');
-                currentlyPlayingButton = null;
-            }
-        });
+    function setupEventListeners() {
+        // Navigation
+        navLinks.forEach(link => link.addEventListener('click', handleNavClick));
+        
+        // Analysis Page
+        addSeriesBtn.addEventListener('click', addSeriesRow);
+        plotBtn.addEventListener('click', handlePlotting);
+        
+        // Top/Flop Table Sorting
+        topFactorsTable.querySelector('thead').addEventListener('click', handleSortClick);
+        
+        // Audio (listens on the whole main container to work for both tables)
+        mainContainer.addEventListener('click', handleAudioPlay);
+        
+        // Audio Player Listeners
+        audioPlayer.addEventListener('ended', resetAudioButton);
         audioPlayer.addEventListener('error', () => {
             alert(`Error: Could not find or play the requested audio file.`);
-            if (currentlyPlayingButton) {
-                currentlyPlayingButton.textContent = 'Play';
-                currentlyPlayingButton.classList.remove('playing');
-                currentlyPlayingButton = null;
+            resetAudioButton();
+        });
+    }
+
+    // --- NAVIGATION ---
+    function handleNavClick(event) {
+        event.preventDefault();
+        const targetId = event.target.dataset.target;
+        
+        pageSections.forEach(section => {
+            section.style.display = section.id === targetId ? 'block' : 'none';
+        });
+        
+        navLinks.forEach(link => {
+            link.classList.toggle('active', link.dataset.target === targetId);
+        });
+    }
+
+    // --- TOP/FLOP 5 TABLE LOGIC ---
+    function handleSortClick(event) {
+        const header = event.target.closest('th');
+        if (!header || !header.classList.contains('sortable-header')) return;
+
+        const newSortKey = header.dataset.sortKey;
+
+        if (newSortKey === currentSortKey) {
+            // Flip direction
+            currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
+        } else {
+            // New column, default to descending (Top 5)
+            currentSortKey = newSortKey;
+            currentSortDirection = 'desc';
+        }
+        renderTopFactorsTable();
+    }
+
+    function renderTopFactorsTable() {
+        // Sort the data
+        const sortedStats = [...allFactorStats].sort((a, b) => {
+            let valA = a[currentSortKey];
+            let valB = b[currentSortKey];
+            
+            // Lower is better for Volatility
+            const direction = currentSortKey === 'Volatility (Ann. %)' ? -1 : 1;
+            
+            if (currentSortDirection === 'asc') {
+                return (valA - valB) * direction;
+            } else {
+                return (valB - valA) * direction;
+            }
+        });
+
+        // Get the Top/Flop 5
+        const top5 = sortedStats.slice(0, 5);
+        
+        // Render the HTML
+        topFactorsTableBody.innerHTML = top5.map(stats => {
+            const factorName = stats.Factor;
+            const audioPath = `audio_portfolios/portfolio_${factorName}.wav`;
+            return `
+                <tr>
+                    <td>${nameMap.get(factorName) || factorName}</td>
+                    <td>${stats['Average Return (Ann. %)'].toFixed(2)}%</td>
+                    <td>${stats['Volatility (Ann. %)'].toFixed(2)}%</td>
+                    <td>${stats['Sharpe Ratio'].toFixed(2)}</td>
+                    <td>${stats.AnnoyanceScore.toFixed(2)}</td>
+                    <td>${stats['FF4 Alpha (Ann. %)'].toFixed(2)}%</td>
+                    <td><button class="play-btn" data-audio-src="${audioPath}">Play</button></td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Update header styles
+        document.querySelectorAll('#top-factors-table .sortable-header').forEach(th => {
+            th.classList.remove('asc', 'desc');
+            if (th.dataset.sortKey === currentSortKey) {
+                th.classList.add(currentSortDirection);
             }
         });
     }
 
+    // --- AUDIO LOGIC ---
     function handleAudioPlay(event) {
-        const clickedButton = event.target;
-        if (!clickedButton.classList.contains('play-btn')) return;
+        const clickedButton = event.target.closest('.play-btn');
+        if (!clickedButton) return;
+        
         const audioSrc = clickedButton.dataset.audioSrc;
         if (clickedButton === currentlyPlayingButton) {
             audioPlayer.pause();
-            clickedButton.textContent = 'Play';
-            clickedButton.classList.remove('playing');
-            currentlyPlayingButton = null;
+            resetAudioButton();
         } else {
-            if (currentlyPlayingButton) {
-                currentlyPlayingButton.textContent = 'Play';
-                currentlyPlayingButton.classList.remove('playing');
-            }
+            if (currentlyPlayingButton) resetAudioButton();
             audioPlayer.src = audioSrc;
             audioPlayer.play();
             clickedButton.textContent = 'Stop';
@@ -94,36 +183,34 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
     
+    function resetAudioButton() {
+        if (currentlyPlayingButton) {
+            currentlyPlayingButton.textContent = 'Play';
+            currentlyPlayingButton.classList.remove('playing');
+            currentlyPlayingButton = null;
+        }
+    }
+    
+    // --- ANALYSIS PAGE LOGIC ---
+    // (Most of this code is the same as before, just placed here)
     function loadPrecomputedStats(csvText) {
         const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
-        const stats = {};
-        let totalFactors = 0;
-        parsed.forEach(row => {
-            if (row.Factor) {
-                stats[row.Factor] = row;
-                totalFactors = row.total_factors || parsed.length;
-            }
-        });
-        allFactorStats = { stats, total: totalFactors };
+        // Convert the stats object to an array for easier sorting
+        allFactorStats = parsed.filter(row => row.Factor); 
     }
-
     function handlePlotting() {
         const selectedFactors = getSelectedFactors();
         if (selectedFactors.length === 0) { alert("Please select at least one factor."); return; }
         plotChart(selectedFactors);
-        updatePerformanceTable(selectedFactors);
+        updateAnalysisTable(selectedFactors);
     }
-    
     function plotChart(selectedFactors) {
         const allDates = new Set();
         selectedFactors.forEach(name => {
             const series = factorTimeSeriesData.get(name);
-            if (series) {
-                series.forEach(d => allDates.add(d.date.getTime()));
-            }
+            if (series) series.forEach(d => allDates.add(d.date.getTime()));
         });
         const masterDateArray = Array.from(allDates).sort((a, b) => a - b);
-
         const datasets = selectedFactors.map(name => {
             const series = factorTimeSeriesData.get(name);
             if (!series || series.length === 0) return null;
@@ -142,38 +229,23 @@ document.addEventListener("DOMContentLoaded", function() {
                 spanGaps: false
             };
         }).filter(Boolean);
-        
         if (chart) chart.destroy();
         const ctx = document.getElementById('factorChart').getContext('2d');
-        
         chart = new Chart(ctx, {
-            type: 'line', 
-            data: { datasets },
+            type: 'line', data: { datasets },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                    x: { 
-                        type: 'time', 
-                        time: { unit: 'year', displayFormats: { year: 'yyyy' } },
-                        title: { display: true, text: 'Date' },
-                        grid: { display: false },
-                        ticks: { maxTicksLimit: 7 }
-                    },
-                    y: { 
-                        type: 'linear', 
-                        title: { display: true, text: 'Cumulative Wealth' }
-                    }
+                    x: { type: 'time', time: { unit: 'year', displayFormats: { year: 'yyyy' } }, title: { display: true, text: 'Date' }, grid: { display: false }, ticks: { maxTicksLimit: 7 } },
+                    y: { type: 'linear', title: { display: true, text: 'Cumulative Wealth' } }
                 },
                 plugins: {
                     tooltip: {
                         callbacks: {
                             title: function(tooltipItems) {
                                 const date = new Date(tooltipItems[0].parsed.x);
-                                return new Intl.DateTimeFormat('en-GB', {
-                                    year: 'numeric', month: 'long', day: 'numeric'
-                                }).format(date);
+                                return new Intl.DateTimeFormat('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }).format(date);
                             }
                         }
                     }
@@ -181,37 +253,34 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
-
-    function updatePerformanceTable(selectedFactors) {
-        tableBody.innerHTML = '';
+    function updateAnalysisTable(selectedFactors) {
+        analysisTableBody.innerHTML = '';
+        const statsMap = new Map(allFactorStats.map(s => [s.Factor, s]));
         selectedFactors.forEach(name => {
-            const stats = allFactorStats.stats[name];
+            const stats = statsMap.get(name);
             if (!stats) { console.warn(`No stats for '${name}'.`); return; }
-            const row = tableBody.insertRow();
-            const total = allFactorStats.total;
+            const row = analysisTableBody.insertRow();
+            const total = allFactorStats.length;
             const formatCell = (value, rank, isPercent = false) => {
                 const displayValue = isPercent ? value.toFixed(2) + '%' : value.toFixed(2);
                 const rankText = rank ? `<br><span class="rank">(${rank}/${total})</span>` : '';
                 return `${displayValue}${rankText}`;
             };
-
             row.innerHTML = `
                 <td>${nameMap.get(name) || name}</td>
                 <td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td>
                 <td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td>
                 <td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td>
-                <td>${formatCell(stats['AnnoyanceScore'], stats['AnnoyanceScore_rank'])}</td>
+                <td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td>
                 <td>${formatCell(stats['CAPM Alpha (Ann. %)'], stats['CAPM Alpha (Ann. %)_rank'])}</td>
                 <td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td>
                 <td><button class="play-btn" data-audio-src="audio_portfolios/portfolio_${name}.wav">Play</button></td>
             `;
         });
     }
-
     function getSelectedFactors() {
         return Array.from(seriesSelectorsContainer.querySelectorAll('.factor-select')).map(sel => sel.value);
     }
-    
     function addSeriesRow() {
         if (seriesSelectorsContainer.children.length >= MAX_SERIES) return;
         const newRow = rowTemplate.cloneNode(true);
@@ -224,7 +293,6 @@ document.addEventListener("DOMContentLoaded", function() {
         newRow.querySelector('.remove-btn').addEventListener('click', () => newRow.remove());
         seriesSelectorsContainer.appendChild(newRow);
     }
-    
     function getRandomColor() {
         const r = Math.floor(Math.random() * 200), g = Math.floor(Math.random() * 200), b = Math.floor(Math.random() * 200);
         return `rgb(${r},${g},${b})`;
