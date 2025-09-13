@@ -19,30 +19,12 @@ body {
     border-bottom: 1px solid #e9ecef;
     background-color: #fff;
 }
+.site-header h1 { margin: 0; font-weight: 400; font-size: 2.5em; }
+.main-nav { margin-top: 15px; }
+.main-nav a { text-decoration: none; color: #495057; margin: 0 15px; font-size: 1.1em; }
+.main-nav a.active { font-weight: bold; color: #000; border-bottom: 2px solid #000; }
 
-.site-header h1 {
-    margin: 0;
-    font-weight: 400;
-    font-size: 2.5em;
-}
-
-.main-nav {
-    margin-top: 15px;
-}
-
-.main-nav a {
-    text-decoration: none;
-    color: #495057;
-    margin: 0 15px;
-    font-size: 1.1em;
-}
-
-.main-nav a.active {
-    font-weight: bold;
-    color: #000;
-    border-bottom: 2px solid #000;
-}
-
+/* Card Styling */
 .card {
     background: #ffffff;
     border-radius: 6px;
@@ -50,7 +32,9 @@ body {
     padding: 25px;
     margin-bottom: 25px;
 }
+.chart-card { min-height: 500px; position: relative; padding: 30px; }
 
+/* Controls Section */
 .controls-header {
     background-color: #000;
     color: #fff;
@@ -59,124 +43,77 @@ body {
     border-radius: 6px 6px 0 0;
     font-weight: bold;
 }
-.series-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 15px;
-    align-items: center;
-    margin-bottom: 15px;
-}
+.series-row { display: grid; grid-template-columns: 1fr auto; gap: 15px; align-items: center; margin-bottom: 15px; }
 select, button {
-    padding: 12px;
-    border-radius: 5px;
-    border: 1px solid #ced4da;
-    font-size: 16px;
-    cursor: pointer;
-    background-color: #fff;
+    padding: 12px; border-radius: 5px; border: 1px solid #ced4da;
+    font-size: 16px; cursor: pointer; background-color: #fff;
     font-family: 'Times New Roman', Times, serif;
 }
-.action-buttons {
-    margin-top: 20px;
-    border-top: 1px solid #e9ecef;
-    padding-top: 20px;
-}
+.action-buttons { margin-top: 20px; border-top: 1px solid #e9ecef; padding-top: 20px; }
 #add-series-btn { border-color: #adb5bd; color: #495057; }
 #plot-btn { border: 1px solid #212529; font-weight: bold; }
 #plot-btn:hover { background-color: #212529; color: #fff; }
 .remove-btn { border: 1px solid #dc3545; color: #dc3545; }
 .remove-btn:hover { background-color: #dc3545; color: white; }
 
-/* Performance Table Styling */
-.table-card {
-    padding-top: 10px;
-}
-
-#performance-table {
+/* --- NEW & UPDATED TABLE STYLES --- */
+/* A common base style for BOTH tables */
+.table-card table {
     width: 100%;
     border-collapse: collapse;
     font-size: 16px;
+    /* This is the key to fixed column widths */
+    table-layout: fixed; 
 }
 
-#performance-table th, #performance-table td {
+.table-card th, .table-card td {
     border: 1px solid #dee2e6;
     padding: 12px;
-    text-align: left;
 }
 
-#performance-table th {
+/* Header styles for both tables */
+.table-card th {
     background-color: #f8f9fa;
     font-weight: bold;
     text-align: center;
-    vertical-align: middle; 
+    vertical-align: middle;
 }
 
-#performance-table td {
+/* Data cell styles for both tables */
+.table-card td {
     text-align: center;
-    vertical-align: middle; /* Ensures vertical centering with two lines */
+    vertical-align: middle;
 }
-
-#performance-table td:first-child {
-    text-align: left;
+.table-card td:first-child {
+    text-align: left; /* Keep factor names left-aligned */
 }
-
 .rank {
     color: #6c757d;
     font-size: 0.9em;
-    margin-left: 5px;
 }
 
+/* Specific column widths for the tables */
+.table-card th:nth-child(1) { width: 26%; } /* Factor */
+.table-card th:nth-child(2),
+.table-card th:nth-child(3),
+.table-card th:nth-child(4),
+.table-card th:nth-child(5),
+.table-card th:nth-child(6),
+.table-card th:nth-child(7) { width: 11%; } /* Data columns */
+.table-card th:nth-child(8) { width: 9%; }  /* Audio */
+
+/* "About" Page Table Specifics (sorting arrows) */
+.sortable-header { cursor: pointer; transition: background-color 0.2s; }
+.sortable-header:hover { background-color: #e9ecef; }
+.sortable-header::after { content: ''; display: inline-block; margin-left: 5px; opacity: 0.4; }
+.sortable-header.asc::after { content: ' ▲'; }
+.sortable-header.desc::after { content: ' ▼'; }
+
+/* Play Button Styling */
 .play-btn {
-    padding: 8px 12px;
-    font-size: 14px;
-    background-color: #e9ecef;
-    border: 1px solid #ced4da;
-    cursor: pointer;
-    transition: background-color 0.2s, color 0.2s;
-    min-width: 60px; /* Ensures buttons have same width */
+    padding: 8px 12px; font-size: 14px; background-color: #e9ecef;
+    border: 1px solid #ced4da; cursor: pointer; transition: background-color 0.2s, color 0.2s;
+    min-width: 60px;
 }
-
-.play-btn:hover {
-    background-color: #adb5bd;
-}
-
-.play-btn.playing {
-    background-color: #28a745; /* green color for 'playing' state */
-    color: white;
-    border-color: #28a745;
-}
-
-
-.chart-card {
-    min-height: 500px; 
-    position: relative;
-    padding: 30px;
-}
-
-/* In style.css, add these new rules */
-
-/* Styling for the sortable headers in the "About" table */
-.sortable-header {
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.sortable-header:hover {
-    background-color: #e9ecef;
-}
-
-.sortable-header::after {
-    content: '';
-    display: inline-block;
-    margin-left: 5px;
-    opacity: 0.4;
-}
-
-.sortable-header.asc::after {
-    content: ' ▲'; /* Up arrow for ascending */
-}
-
-.sortable-header.desc::after {
-    content: ' ▼'; /* Down arrow for descending */
-}
-
-
+.play-btn:hover { background-color: #adb5bd; }
+.play-btn.playing { background-color: #28a745; color: white; border-color: #28a745; }
