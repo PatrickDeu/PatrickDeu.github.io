@@ -110,6 +110,15 @@ select, button {
     vertical-align: middle; 
 }
 
+#performance-table td {
+    text-align: center;
+    vertical-align: middle; /* Ensures vertical centering with two lines */
+}
+
+#performance-table td:first-child {
+    text-align: left;
+}
+
 .rank {
     color: #6c757d;
     font-size: 0.9em;
@@ -142,5 +151,7 @@ select, button {
     position: relative;
     padding: 30px;
 }
+
+
 
 
