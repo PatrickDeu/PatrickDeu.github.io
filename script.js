@@ -152,22 +152,14 @@ document.addEventListener("DOMContentLoaded", function() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-
                 interaction: { mode: 'index', intersect: false },
-                
                 scales: {
                     x: { 
                         type: 'time', 
-                        time: { 
-                            unit: 'year',
-                            displayFormats: { year: 'yyyy' }
-                        },
+                        time: { unit: 'year', displayFormats: { year: 'yyyy' } },
                         title: { display: true, text: 'Date' },
                         grid: { display: false },
-                        
-                        ticks: {
-                            maxTicksLimit: 7 
-                        }
+                        ticks: { maxTicksLimit: 7 }
                     },
                     y: { 
                         type: 'linear', 
@@ -199,9 +191,10 @@ document.addEventListener("DOMContentLoaded", function() {
             const total = allFactorStats.total;
             const formatCell = (value, rank, isPercent = false) => {
                 const displayValue = isPercent ? value.toFixed(2) + '%' : value.toFixed(2);
-                const rankText = rank ? `<span class="rank">(${rank}/${total})</span>` : '';
-                return `${displayValue} ${rankText}`;
+                const rankText = rank ? `<br><span class="rank">(${rank}/${total})</span>` : '';
+                return `${displayValue}${rankText}`;
             };
+
             row.innerHTML = `
                 <td>${nameMap.get(name) || name}</td>
                 <td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td>
