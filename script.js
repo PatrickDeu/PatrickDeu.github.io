@@ -8,11 +8,9 @@ document.addEventListener("DOMContentLoaded", function() {
     let chart;
     let factorTimeSeriesData = new Map();
     let nameMap = new Map();
-    let allFactorStats = {}; // Will be an array of objects
+    let allFactorStats = []; // An array of stat objects
     const audioPlayer = new Audio();
     let currentlyPlayingButton = null;
-    
-    // State for the interactive Top/Flop table
     let currentSortKey = 'Sharpe Ratio';
     let currentSortDirection = 'desc';
 
@@ -31,11 +29,8 @@ document.addEventListener("DOMContentLoaded", function() {
     // --- INITIALIZATION ---
     async function init() {
         try {
-            // Data Loading...
             const [rawDataResponse, namesResponse, statsResponse] = await Promise.all([
-                fetch('data.csv'),
-                fetch('factor_names.csv'),
-                fetch('factor_stats.csv')
+                fetch('data.csv'), fetch('factor_names.csv'), fetch('factor_stats.csv')
             ]);
             
             const statsText = await statsResponse.text();
@@ -52,11 +47,8 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             factorTimeSeriesData.forEach(series => series.sort((a, b) => a.date - b.date));
             
-            // Initial UI Setup
             addSeriesRow();
-            renderTopFactorsTable(); // Render the default Top 5 Sharpe table
-            
-            // Event Listeners
+            renderTopFactorsTable();
             setupEventListeners();
 
         } catch (error) {
@@ -66,20 +58,11 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function setupEventListeners() {
-        // Navigation
         navLinks.forEach(link => link.addEventListener('click', handleNavClick));
-        
-        // Analysis Page
         addSeriesBtn.addEventListener('click', addSeriesRow);
         plotBtn.addEventListener('click', handlePlotting);
-        
-        // Top/Flop Table Sorting
         topFactorsTable.querySelector('thead').addEventListener('click', handleSortClick);
-        
-        // Audio (listens on the whole main container to work for both tables)
         mainContainer.addEventListener('click', handleAudioPlay);
-        
-        // Audio Player Listeners
         audioPlayer.addEventListener('ended', resetAudioButton);
         audioPlayer.addEventListener('error', () => {
             alert(`Error: Could not find or play the requested audio file.`);
@@ -87,32 +70,21 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // --- NAVIGATION ---
     function handleNavClick(event) {
         event.preventDefault();
         const targetId = event.target.dataset.target;
-        
-        pageSections.forEach(section => {
-            section.style.display = section.id === targetId ? 'block' : 'none';
-        });
-        
-        navLinks.forEach(link => {
-            link.classList.toggle('active', link.dataset.target === targetId);
-        });
+        pageSections.forEach(section => section.style.display = section.id === targetId ? 'block' : 'none');
+        navLinks.forEach(link => link.classList.toggle('active', link.dataset.target === targetId));
     }
 
-    // --- TOP/FLOP 5 TABLE LOGIC ---
+    // --- TOP/FLOP 5 TABLE LOGIC (THIS FUNCTION IS UPDATED) ---
     function handleSortClick(event) {
         const header = event.target.closest('th');
         if (!header || !header.classList.contains('sortable-header')) return;
-
         const newSortKey = header.dataset.sortKey;
-
         if (newSortKey === currentSortKey) {
-            // Flip direction
             currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
         } else {
-            // New column, default to descending (Top 5)
             currentSortKey = newSortKey;
             currentSortDirection = 'desc';
         }
@@ -120,14 +92,11 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function renderTopFactorsTable() {
-        // Sort the data
         const sortedStats = [...allFactorStats].sort((a, b) => {
             let valA = a[currentSortKey];
             let valB = b[currentSortKey];
-            
-            // Lower is better for Volatility
-            const direction = currentSortKey === 'Volatility (Ann. %)' ? -1 : 1;
-            
+            // Lower is better for Volatility and Annoyance
+            const direction = ['Volatility (Ann. %)', 'AnnoyanceScore'].includes(currentSortKey) ? -1 : 1;
             if (currentSortDirection === 'asc') {
                 return (valA - valB) * direction;
             } else {
@@ -135,27 +104,33 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
 
-        // Get the Top/Flop 5
         const top5 = sortedStats.slice(0, 5);
+        const total = allFactorStats.length;
+
+        // Helper function to format cells with rank on a new line
+        const formatCell = (value, rank, isPercent = false) => {
+            const displayValue = isPercent ? value.toFixed(2) + '%' : value.toFixed(2);
+            const rankText = rank ? `<br><span class="rank">(${rank}/${total})</span>` : '';
+            return `${displayValue}${rankText}`;
+        };
         
-        // Render the HTML
+        // Render the HTML using the formatCell helper
         topFactorsTableBody.innerHTML = top5.map(stats => {
             const factorName = stats.Factor;
             const audioPath = `audio_portfolios/portfolio_${factorName}.wav`;
             return `
                 <tr>
                     <td>${nameMap.get(factorName) || factorName}</td>
-                    <td>${stats['Average Return (Ann. %)'].toFixed(2)}%</td>
-                    <td>${stats['Volatility (Ann. %)'].toFixed(2)}%</td>
-                    <td>${stats['Sharpe Ratio'].toFixed(2)}</td>
-                    <td>${stats.AnnoyanceScore.toFixed(2)}</td>
-                    <td>${stats['FF4 Alpha (Ann. %)'].toFixed(2)}%</td>
+                    <td>${formatCell(stats['Average Return (Ann. %)'], stats['Average Return (Ann. %)_rank'])}</td>
+                    <td>${formatCell(stats['Volatility (Ann. %)'], stats['Volatility (Ann. %)_rank'])}</td>
+                    <td>${formatCell(stats['Sharpe Ratio'], stats['Sharpe Ratio_rank'])}</td>
+                    <td>${formatCell(stats.AnnoyanceScore, stats.AnnoyanceScore_rank)}</td>
+                    <td>${formatCell(stats['FF4 Alpha (Ann. %)'], stats['FF4 Alpha (Ann. %)_rank'])}</td>
                     <td><button class="play-btn" data-audio-src="${audioPath}">Play</button></td>
                 </tr>
             `;
         }).join('');
         
-        // Update header styles
         document.querySelectorAll('#top-factors-table .sortable-header').forEach(th => {
             th.classList.remove('asc', 'desc');
             if (th.dataset.sortKey === currentSortKey) {
@@ -164,11 +139,10 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // --- AUDIO LOGIC ---
+    // --- AUDIO & ANALYSIS PAGE LOGIC (No changes below) ---
     function handleAudioPlay(event) {
         const clickedButton = event.target.closest('.play-btn');
         if (!clickedButton) return;
-        
         const audioSrc = clickedButton.dataset.audioSrc;
         if (clickedButton === currentlyPlayingButton) {
             audioPlayer.pause();
@@ -182,7 +156,6 @@ document.addEventListener("DOMContentLoaded", function() {
             currentlyPlayingButton = clickedButton;
         }
     }
-    
     function resetAudioButton() {
         if (currentlyPlayingButton) {
             currentlyPlayingButton.textContent = 'Play';
@@ -190,12 +163,8 @@ document.addEventListener("DOMContentLoaded", function() {
             currentlyPlayingButton = null;
         }
     }
-    
-    // --- ANALYSIS PAGE LOGIC ---
-    // (Most of this code is the same as before, just placed here)
     function loadPrecomputedStats(csvText) {
         const parsed = Papa.parse(csvText, { header: true, dynamicTyping: true }).data;
-        // Convert the stats object to an array for easier sorting
         allFactorStats = parsed.filter(row => row.Factor); 
     }
     function handlePlotting() {
