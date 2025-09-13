@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let chart;
     let factorTimeSeriesData = new Map();
     let nameMap = new Map();
-    let allFactorStats = []; // An array of stat objects
+    let allFactorStats = [];
     const audioPlayer = new Audio();
     let currentlyPlayingButton = null;
     let currentSortKey = 'Sharpe Ratio';
@@ -77,7 +77,6 @@ document.addEventListener("DOMContentLoaded", function() {
         navLinks.forEach(link => link.classList.toggle('active', link.dataset.target === targetId));
     }
 
-    // --- TOP/FLOP 5 TABLE LOGIC (THIS FUNCTION IS UPDATED) ---
     function handleSortClick(event) {
         const header = event.target.closest('th');
         if (!header || !header.classList.contains('sortable-header')) return;
@@ -93,28 +92,18 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function renderTopFactorsTable() {
         const sortedStats = [...allFactorStats].sort((a, b) => {
-            let valA = a[currentSortKey];
-            let valB = b[currentSortKey];
-            // Lower is better for Volatility and Annoyance
+            let valA = a[currentSortKey]; let valB = b[currentSortKey];
             const direction = ['Volatility (Ann. %)', 'AnnoyanceScore'].includes(currentSortKey) ? -1 : 1;
-            if (currentSortDirection === 'asc') {
-                return (valA - valB) * direction;
-            } else {
-                return (valB - valA) * direction;
-            }
+            if (currentSortDirection === 'asc') { return (valA - valB) * direction; } 
+            else { return (valB - valA) * direction; }
         });
-
         const top5 = sortedStats.slice(0, 5);
         const total = allFactorStats.length;
-
-        // Helper function to format cells with rank on a new line
         const formatCell = (value, rank, isPercent = false) => {
             const displayValue = isPercent ? value.toFixed(2) + '%' : value.toFixed(2);
             const rankText = rank ? `<br><span class="rank">(${rank}/${total})</span>` : '';
             return `${displayValue}${rankText}`;
         };
-        
-        // Render the HTML using the formatCell helper
         topFactorsTableBody.innerHTML = top5.map(stats => {
             const factorName = stats.Factor;
             const audioPath = `audio_portfolios/portfolio_${factorName}.wav`;
@@ -130,16 +119,12 @@ document.addEventListener("DOMContentLoaded", function() {
                 </tr>
             `;
         }).join('');
-        
         document.querySelectorAll('#top-factors-table .sortable-header').forEach(th => {
             th.classList.remove('asc', 'desc');
-            if (th.dataset.sortKey === currentSortKey) {
-                th.classList.add(currentSortDirection);
-            }
+            if (th.dataset.sortKey === currentSortKey) { th.classList.add(currentSortDirection); }
         });
     }
 
-    // --- AUDIO & ANALYSIS PAGE LOGIC (No changes below) ---
     function handleAudioPlay(event) {
         const clickedButton = event.target.closest('.play-btn');
         if (!clickedButton) return;
@@ -173,6 +158,8 @@ document.addEventListener("DOMContentLoaded", function() {
         plotChart(selectedFactors);
         updateAnalysisTable(selectedFactors);
     }
+    
+    // --- THIS FUNCTION CONTAINS THE PLOT FIX ---
     function plotChart(selectedFactors) {
         const allDates = new Set();
         selectedFactors.forEach(name => {
@@ -203,7 +190,13 @@ document.addEventListener("DOMContentLoaded", function() {
         chart = new Chart(ctx, {
             type: 'line', data: { datasets },
             options: {
-                responsive: true, maintainAspectRatio: false,
+                responsive: true,
+                // FIX 3: MAINTAIN ASPECT RATIO
+                // This forces the chart to maintain its shape as it scales.
+                // A value of 1.7 is a good starting point (wider than tall).
+                // It also fixes the bug of the chart not growing back.
+                aspectRatio: 1.7, 
+                
                 interaction: { mode: 'index', intersect: false },
                 scales: {
                     x: { type: 'time', time: { unit: 'year', displayFormats: { year: 'yyyy' } }, title: { display: true, text: 'Date' }, grid: { display: false }, ticks: { maxTicksLimit: 7 } },
@@ -222,6 +215,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
+
     function updateAnalysisTable(selectedFactors) {
         analysisTableBody.innerHTML = '';
         const statsMap = new Map(allFactorStats.map(s => [s.Factor, s]));
