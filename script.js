@@ -114,7 +114,6 @@ document.addEventListener("DOMContentLoaded", function() {
         updatePerformanceTable(selectedFactors);
     }
     
-    // --- THIS FUNCTION CONTAINS ALL THE AESTHETIC UPDATES ---
     function plotChart(selectedFactors) {
         const allDates = new Set();
         selectedFactors.forEach(name => {
@@ -151,9 +150,8 @@ document.addEventListener("DOMContentLoaded", function() {
             type: 'line', 
             data: { datasets },
             options: {
-                // FIX 1: RESPONSIVENESS - Allow chart to grow and shrink
                 responsive: true,
-                maintainAspectRatio: false, // This is the key to making it grow back
+                maintainAspectRatio: false,
 
                 interaction: { mode: 'index', intersect: false },
                 
@@ -162,40 +160,27 @@ document.addEventListener("DOMContentLoaded", function() {
                         type: 'time', 
                         time: { 
                             unit: 'year',
-                            // FIX 2: X-AXIS TICKS - Show a label roughly every 10 years
-                            stepSize: 10,
-                            // This formats the axis labels themselves (e.g., '2000', '2010')
-                            displayFormats: {
-                                year: 'yyyy'
-                            }
+                            displayFormats: { year: 'yyyy' }
                         },
                         title: { display: true, text: 'Date' },
-                        // FIX 3: REMOVE VERTICAL GRID LINES
-                        grid: {
-                            display: false 
+                        grid: { display: false },
+                        
+                        ticks: {
+                            maxTicksLimit: 7 
                         }
                     },
                     y: { 
-                        // FIX 4: Y-AXIS SCALE - No longer logarithmic
                         type: 'linear', 
-                        title: { 
-                            display: true, 
-                            // FIX 5: Y-AXIS LABEL
-                            text: 'Cumulative Wealth' 
-                        }
+                        title: { display: true, text: 'Cumulative Wealth' }
                     }
                 },
                 plugins: {
                     tooltip: {
                         callbacks: {
-                            // FIX 6: TOOLTIP FORMAT - Show only Year, Month, Day
                             title: function(tooltipItems) {
                                 const date = new Date(tooltipItems[0].parsed.x);
-                                // Using Intl.DateTimeFormat for clean, localized date formatting
                                 return new Intl.DateTimeFormat('en-GB', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
+                                    year: 'numeric', month: 'long', day: 'numeric'
                                 }).format(date);
                             }
                         }
