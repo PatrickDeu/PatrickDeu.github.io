@@ -1,3 +1,7 @@
+html {
+    overflow-y: scroll;
+}
+
 /* Basic Setup & Font */
 body {
     font-family: 'Times New Roman', Times, serif;
